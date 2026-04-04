@@ -12,18 +12,6 @@ BASE_DIR = Path(__file__).parent
 DATA_DIR = BASE_DIR / "data"
 QUEUE_DIR = BASE_DIR / "queue"
 
-# Load README once at startup, extract compact context for tweet generation
-_README_PATH = BASE_DIR / "README.md"
-_README_RAW = _README_PATH.read_text() if _README_PATH.exists() else ""
-
-def _build_context(raw: str) -> str:
-    if not raw: return "OpenClay is a local AI bootstrapper."
-    lines = raw.splitlines()[:40]
-    useful = [ln for ln in lines if ln.strip()
-              and not ln.strip().startswith(("```", "!["))]
-    return "\n".join(useful)[:1200]
-
-_README_CONTEXT = _build_context(_README_RAW)
 
 def _hide_all(status="", show_inputs=True):
     vis_in = gr.update(visible=show_inputs)
@@ -150,14 +138,9 @@ def _twitter_flow(topic: str):
     yield _hide_all(_verb("Thinking..."))
     try:
         from agent_backend import generate
-        raw = generate(
-            f"ABOUT OPENCLAY:\n{_README_CONTEXT}\n\n---\n\n"
-            f"Topic: {topic}\n\n"
-            "Write exactly ONE tweet. Max 280 chars. 1-2 hashtags.\n"
-            "RULES: Output ONLY the tweet. No quotes. No labels. "
-            "No questions. No planning.\n"
-            "Use real facts about OpenClay from above. Just the tweet text.\n"
-        )
+        from wiki_engine import build_tweet_prompt
+        prompt = build_tweet_prompt(topic)
+        raw = generate(prompt)
     except Exception as e:
         yield _hide_all(f"**Error:** {e}")
         return
@@ -197,6 +180,11 @@ def _handle_confirm_tweet(tweet_text):
     result = post_tweet(tweet_text.strip())
     if result.get("success"):
         tid = result.get("tweet_id", "")
+        try:
+            from wiki_engine import log_posted_tweet
+            log_posted_tweet(tweet_text.strip(), tweet_id=tid)
+        except Exception:
+            pass  # wiki logging is best-effort
         return _out(f"**Posted.** Tweet ID: {tid}")
     return _out(f"**Error:** {result.get('error', 'Unknown error')}")
 
