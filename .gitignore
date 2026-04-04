@@ -1,0 +1,32 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.egg-info/
+dist/
+build/
+*.egg
+
+# Environment & secrets
+.env
+*.env.local
+
+# OS
+.DS_Store
+Thumbs.db
+
+# OpenClay runtime
+inbox/
+queue/
+logs/
+data/
+content/
+knowledge_base/
+project/
+agent_decisions.md
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo

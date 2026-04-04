@@ -1,0 +1,25 @@
+{
+  "name": "creator",
+  "description": "Content pipeline, publishing, revenue engine",
+  "pipeline_stages": [
+    "ideation",
+    "outline",
+    "draft",
+    "edit",
+    "format",
+    "publish"
+  ],
+  "default_tools": ["pandoc", "ffmpeg", "markdown_editor"],
+  "auto_actions": {
+    "on_new_idea": "generate_outline",
+    "on_outline_complete": "draft_content",
+    "on_draft_complete": "convert_format"
+  },
+  "content_types": ["blog", "newsletter", "social", "video_script", "podcast_notes"],
+  "output_formats": ["html", "pdf", "docx"],
+  "schedule": {
+    "content_review": "weekly",
+    "idea_generation": "daily",
+    "analytics_check": "weekly"
+  }
+}

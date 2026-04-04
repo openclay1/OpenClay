@@ -1,0 +1,21 @@
+{
+  "version": "0.1.0",
+  "name": "OpenClay",
+  "model": "auto",
+  "panel_port": 7861,
+  "agent_loop_interval_seconds": 5,
+  "max_intake_exchanges": 3,
+  "confidence_threshold": 0.7,
+  "auto_retry_count": 2,
+  "backoff_notify_hours": 4,
+  "max_module_lines": 300,
+  "demo_mode": false,
+  "demo_asset": "demo_assets/sample_intake.json",
+  "paths": {
+    "data": "data",
+    "queue": "queue",
+    "logs": "logs",
+    "profiles": "profiles",
+    "demo_assets": "demo_assets"
+  }
+}

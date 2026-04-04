@@ -1,0 +1,24 @@
+{
+  "name": "researcher",
+  "description": "Document ingestion, local RAG, citation management",
+  "pipeline_stages": [
+    "ingest",
+    "extract",
+    "index",
+    "summarize",
+    "connect",
+    "cite"
+  ],
+  "default_tools": ["chromadb", "pdftotext", "pandoc"],
+  "auto_actions": {
+    "on_file_drop": "ingest_document",
+    "on_ingest_complete": "summarize",
+    "on_query": "search"
+  },
+  "supported_formats": [".pdf", ".txt", ".md", ".csv", ".docx", ".epub"],
+  "knowledge_base": {
+    "inbox_dir": "knowledge_base/inbox",
+    "processed_dir": "knowledge_base/processed",
+    "notes_dir": "knowledge_base/notes"
+  }
+}

@@ -1,0 +1,20 @@
+{
+  "name": "builder",
+  "description": "Code generation, local dev environment, deployment scripts",
+  "pipeline_stages": [
+    "spec",
+    "scaffold",
+    "generate",
+    "test",
+    "document",
+    "deploy"
+  ],
+  "default_tools": ["git", "docker"],
+  "auto_actions": {
+    "on_spec": "scaffold_project",
+    "on_scaffold_complete": "generate_code",
+    "on_code_complete": "create_dockerfile"
+  },
+  "languages": ["python", "javascript", "typescript", "go", "rust"],
+  "deploy_targets": ["docker", "local", "script"]
+}

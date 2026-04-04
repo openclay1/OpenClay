@@ -1,0 +1,28 @@
+{
+  "name": "operator",
+  "description": "Workflow automation, email, calendar, task management",
+  "pipeline_stages": [
+    "capture",
+    "categorize",
+    "schedule",
+    "execute",
+    "verify",
+    "report"
+  ],
+  "default_tools": ["n8n", "jq", "sqlite3_tool"],
+  "auto_actions": {
+    "on_task_created": "categorize",
+    "on_workflow_trigger": "execute",
+    "on_error": "retry_then_notify"
+  },
+  "integrations": {
+    "email": "configurable",
+    "calendar": "configurable",
+    "file_system": "automatic"
+  },
+  "schedule": {
+    "task_review": "daily",
+    "workflow_health": "hourly",
+    "weekly_report": "weekly"
+  }
+}

@@ -1,0 +1,7 @@
+{
+  "name": "blank",
+  "description": "No profile — full inference from intake",
+  "pipeline_stages": [],
+  "default_tools": [],
+  "auto_actions": {}
+}

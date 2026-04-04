@@ -1,0 +1,9 @@
+{
+  "archetype": "clear",
+  "goal": "Set up a content creation pipeline that takes my rough ideas and turns them into blog posts and social media threads automatically",
+  "tools_mentioned": [],
+  "domain": "content",
+  "urgency": "medium",
+  "complexity": "moderate",
+  "raw_input": "I need a system that takes my rough ideas and turns them into blog posts and social media threads automatically"
+}

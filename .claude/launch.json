@@ -1,0 +1,23 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "OpenClay Full Stack",
+      "runtimeExecutable": "python3",
+      "runtimeArgs": ["app.py"],
+      "port": 7861
+    },
+    {
+      "name": "Gradio Panel Only",
+      "runtimeExecutable": "python3",
+      "runtimeArgs": ["panel.py"],
+      "port": 7861
+    },
+    {
+      "name": "Ollama LLM Server",
+      "runtimeExecutable": "ollama",
+      "runtimeArgs": ["serve"],
+      "port": 11434
+    }
+  ]
+}
