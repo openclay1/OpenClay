@@ -34,40 +34,40 @@ FAST_COURT_STYLE = (
 CAPTION_PROMPT = (
     "You are a social media manager for Fast Court Tennis.\n\n"
     f"{FAST_COURT_STYLE}\n"
-    "Analyze the image(s) provided. Describe what you see (players, court, "
-    "action, mood, setting) then write ONE Instagram caption.\n\n"
-    "Format your response EXACTLY like this:\n"
-    "[ANALYSIS]\n(brief description of what's in the images)\n\n"
-    "[CAPTION]\n(the full caption text)\n\n"
-    "[HASHTAGS]\n(hashtags on one line)"
+    "Look at the image(s). Write ONE finished Instagram caption.\n\n"
+    "RULES — FOLLOW EXACTLY:\n"
+    "- Output the FINAL caption only. Ready to copy-paste and post.\n"
+    "- NO planning. NO step lists. NO reasoning. NO 'Here's what I'll do'.\n"
+    "- NO questions. NO 'Would you like'. NO 'Let me know'. NO 'Should I'.\n"
+    "- NO tool lists. NO 'You'll need'. NO suggestions for next steps.\n"
+    "- Just the caption text, then hashtags. Nothing else.\n\n"
+    "FORMAT (exactly this, nothing more):\n"
+    "[CAPTION]\n(the complete ready-to-post caption)\n\n"
+    "[HASHTAGS]\n(15-20 hashtags on one line)"
 )
 
 
 def _log_decision(action: str, detail: str, confidence: float = 1.0):
     """Log to agent_log table and decisions file."""
     try:
-        conn = sqlite3.connect(str(DB_PATH))
-        conn.execute("INSERT INTO agent_log (module,action,detail,confidence) VALUES (?,?,?,?)",
-                     ("vision_caption", action, detail, confidence))
-        conn.commit(); conn.close()
-    except Exception:
-        pass
+        c = sqlite3.connect(str(DB_PATH))
+        c.execute("INSERT INTO agent_log (module,action,detail,confidence) VALUES (?,?,?,?)",
+                  ("vision_caption", action, detail, confidence))
+        c.commit(); c.close()
+    except Exception: pass
     try:
         with open(BASE_DIR / "agent_decisions.md", "a") as f:
             f.write(f"- **vision_caption**: {action} — {detail} ({confidence})\n")
-    except Exception:
-        pass
+    except Exception: pass
 
 
 def _read_env_key(key: str) -> str:
-    """Read a single key from .env."""
     if ENV_PATH.exists():
         for line in ENV_PATH.read_text().splitlines():
             l = line.strip()
             if l and not l.startswith("#") and "=" in l:
                 k, _, v = l.partition("=")
-                if k.strip() == key:
-                    return v.strip()
+                if k.strip() == key: return v.strip()
     return os.environ.get(key, "")
 
 
@@ -180,13 +180,9 @@ def _detect_llava_model() -> str | None:
         resp = requests.get(f"{OLLAMA_URL}/api/tags", timeout=5)
         if resp.status_code != 200:
             return None
-        local = {m["name"].split(":")[0] for m in resp.json().get("models", [])}
-        # Also keep full name:tag matches
-        local_full = {m["name"] for m in resp.json().get("models", [])}
-        for candidate in LLAVA_MODELS:
-            if candidate in local or candidate in local_full:
-                return candidate
-        return None
+        models = resp.json().get("models", [])
+        local = {m["name"].split(":")[0] for m in models} | {m["name"] for m in models}
+        return next((c for c in LLAVA_MODELS if c in local), None)
     except Exception:
         return None
 
@@ -241,9 +237,9 @@ def _generate_via_ollama_text(paths: list[Path]) -> dict:
     filenames = ", ".join(p.name for p in paths)
     prompt = (
         f"{FAST_COURT_STYLE}\n\n"
-        f"I'm posting a carousel of {len(paths)} tennis images "
-        f"(files: {filenames}). Write an Instagram caption.\n\n"
-        "Format:\n[CAPTION]\n(caption text)\n\n[HASHTAGS]\n(hashtags)"
+        f"I'm posting {len(paths)} tennis images ({filenames}).\n"
+        "Write the FINAL caption only. No planning. No questions.\n\n"
+        "Format:\n[CAPTION]\n(caption)\n\n[HASHTAGS]\n(15-20 hashtags)"
     )
     try:
         resp = requests.post(
@@ -286,4 +282,18 @@ def _parse_caption_response(text: str) -> dict:
     if not result["caption"]:
         result["caption"] = text.strip()
 
+    # Strip questions, planning, and reasoning the model might add
+    _STRIP = (
+        "would you like", "do you want", "should i", "let me know",
+        "shall i", "do you need", "want me to", "i can also", "feel free",
+        "here's what", "here is what", "step 1", "step 2", "step 3",
+        "first,", "next,", "then,", "finally,", "to do this",
+        "you'll need", "you will need", "tools needed", "requirements:",
+        "plan:", "approach:", "strategy:", "let's", "i'll",
+    )
+    for f in ("caption", "analysis"):
+        result[f] = "\n".join(
+            ln for ln in result[f].splitlines()
+            if not any(ln.strip().lower().startswith(q) for q in _STRIP)
+        ).strip()
     return result

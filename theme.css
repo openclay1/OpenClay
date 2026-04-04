@@ -1,26 +1,18 @@
 @import url('https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&display=swap');
 @import url('https://api.fontshare.com/v2/css?f[]=satoshi@300,400,500,600,700&display=swap');
 
-/* ─── DESIGN TOKENS (from openclay-landing.html) ─── */
+/* ─── DESIGN TOKENS ─── */
 .gradio-container {
     --color-bg:               #161310;
     --color-surface:          #1b1814;
     --color-surface-2:        #201d19;
-    --color-surface-offset:   #1e1b17;
-    --color-surface-offset-2: #242018;
-    --color-surface-dynamic:  #2d2920;
-    --color-divider:          #2a2720;
     --color-border:           #373330;
-    --color-text:             #cec8c0;
+    --color-divider:          #2a2720;
+    --color-text:             #f0ece6;
     --color-text-muted:       #7a7468;
-    --color-text-faint:       #524e48;
-    --color-text-inverse:     #1b1814;
     --color-primary:          #e06438;
     --color-primary-hover:    #d05025;
-    --color-primary-active:   #b84020;
-    --color-primary-highlight:#3d2418;
     --color-accent-soft:      rgba(224,100,56,0.10);
-    --radius-sm:   0.375rem;
     --radius-md:   0.5rem;
     --radius-lg:   0.75rem;
     --radius-xl:   1rem;
@@ -29,271 +21,258 @@
     --transition:  180ms cubic-bezier(0.16, 1, 0.3, 1);
     --shadow-sm:   0 1px 3px rgba(0,0,0,0.25);
     --shadow-md:   0 4px 16px rgba(0,0,0,0.35);
-    --shadow-lg:   0 12px 40px rgba(0,0,0,0.45);
     --font-display: 'Instrument Serif', Georgia, serif;
     --font-body:    'Satoshi', 'Inter', system-ui, sans-serif;
 }
 
-/* ─── BASE CONTAINER ─── */
+/* ─── BASE ─── */
 .gradio-container {
     background: var(--color-bg) !important;
     font-family: var(--font-body) !important;
     color: var(--color-text) !important;
+    max-width: 640px !important;
+    margin: 0 auto !important;
+    padding: 40px 24px !important;
     -webkit-font-smoothing: antialiased;
 }
 
-/* ─── ALL SURFACE / CARD BACKGROUNDS ─── */
-.gr-panel, .gr-box, .gr-form, .gr-block,
-.gr-padded, .contain,
+/* Kill all default Gradio backgrounds */
+.gr-panel, .gr-box, .gr-form, .gr-block, .gr-padded, .contain,
 div[class*="block"], div[class*="panel"],
-.gradio-container .block,
-.gradio-container .form,
-.gradio-container .wrap {
-    background: var(--color-surface) !important;
-    border-color: var(--color-border) !important;
+.gradio-container .block, .gradio-container .form,
+.gradio-container .wrap, .gr-group, .gap, .row, .column {
+    background: transparent !important;
+    border-color: transparent !important;
 }
 
-/* ─── TYPOGRAPHY: headings — Instrument Serif italic ─── */
-h1, h2, .main-header h1, .main-header h2,
-.main-header span, .main-header p {
+/* Hide Gradio footer */
+footer, .gradio-container > footer { display: none !important; }
+
+/* ─── TITLE ─── */
+.app-title h1 {
     font-family: var(--font-display) !important;
     font-style: italic !important;
+    font-size: 3rem !important;
     color: var(--color-text) !important;
-    line-height: 1.15 !important;
-    text-wrap: balance;
+    text-align: center !important;
+    margin: 0 0 4px 0 !important;
+    line-height: 1.1 !important;
 }
-
-/* ─── BODY TEXT ─── */
-p, li, span, div, td, th {
-    font-family: var(--font-body) !important;
-    color: var(--color-text) !important;
-}
-
-/* ─── MUTED TEXT ─── */
-label, .label-wrap, .gr-check-radio,
-.secondary-text, .caption, .info,
-small, .gr-file-preview {
+.app-sub, .app-sub p {
+    text-align: center !important;
     color: var(--color-text-muted) !important;
+    font-size: 16px !important;
+    margin-bottom: 32px !important;
     font-family: var(--font-body) !important;
 }
 
-/* ─── SECTION HEADINGS (h3) ─── */
-h3 {
-    font-family: var(--font-display) !important;
-    font-style: italic !important;
-    color: var(--color-primary) !important;
-    border-bottom: 1px solid var(--color-divider);
-    padding-bottom: 6px;
-}
-
-/* ─── SECTION BOX CARDS ─── */
-.section-box {
+/* ─── DROP ZONE: big, obvious, hero element ─── */
+.drop-zone, .drop-zone > div,
+.drop-zone .upload-container,
+.drop-zone div[data-testid="file"],
+.drop-zone div[data-testid="file"] > div {
     background: var(--color-surface) !important;
-    border: 1px solid var(--color-border) !important;
-    border-radius: var(--radius-xl) !important;
-    padding: 16px !important;
-    margin: 8px 0 !important;
-    box-shadow: var(--shadow-sm) !important;
+    border: 2px dashed var(--color-border) !important;
+    border-radius: var(--radius-2xl) !important;
+    min-height: 180px !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    box-shadow: none !important;
+    padding: 32px !important;
+    transform: none !important;
     transition: all var(--transition);
 }
-.section-box:hover {
+.drop-zone:hover, .drop-zone:hover > div,
+.drop-zone:hover div[data-testid="file"],
+.drop-zone:hover div[data-testid="file"] > div {
     border-color: var(--color-primary) !important;
     background: var(--color-accent-soft) !important;
 }
-
-.main-header {
-    text-align: center;
-    margin-bottom: 20px;
+.drop-zone label, .drop-zone .label-wrap {
+    color: var(--color-text-muted) !important;
+    font-size: 18px !important;
+    font-weight: 500 !important;
+    font-family: var(--font-body) !important;
 }
-.main-header h1, #title h1, .gradio-container h1 {
-    font-size: 3.5rem !important;
-    font-family: var(--font-display) !important;
-    font-style: italic !important;
+/* Small button inside upload */
+.drop-zone button {
+    border-radius: var(--radius-full) !important;
+    padding: 8px 20px !important;
+    font-size: 14px !important;
+    width: auto !important;
+    max-width: none !important;
 }
 
-/* ─── INPUTS ─── */
-textarea, input[type="text"], input[type="password"],
-.gr-text-input, .gr-textbox textarea,
-div[data-testid="textbox"] textarea {
-    background: var(--color-bg) !important;
+/* ─── TOPIC INPUT ─── */
+.topic-input textarea, .topic-input input {
+    background: var(--color-surface) !important;
     border: 1px solid var(--color-border) !important;
-    border-radius: var(--radius-md) !important;
+    border-radius: var(--radius-lg) !important;
     color: var(--color-text) !important;
     font-family: var(--font-body) !important;
+    font-size: 16px !important;
+    padding: 14px 16px !important;
     transition: border-color var(--transition), box-shadow var(--transition);
 }
-textarea:focus, input[type="text"]:focus {
+.topic-input textarea:focus, .topic-input input:focus {
     border-color: var(--color-primary) !important;
     outline: none !important;
     box-shadow: 0 0 0 2px var(--color-accent-soft) !important;
 }
+.topic-input label, .topic-input .label-wrap {
+    color: var(--color-text-muted) !important;
+    font-size: 14px !important;
+    font-family: var(--font-body) !important;
+}
 
-/* ─── BUTTONS: pill shape, accent primary (scoped to real buttons only) ─── */
-.gr-button,
-button.primary, button.secondary,
-button[class*="primary"], button[class*="secondary"],
-.gradio-container > .wrap button,
-.gradio-container button[type="submit"] {
+/* ─── GO BUTTON: big, centered, unmissable ─── */
+.go-btn, .go-btn button {
+    width: 100% !important;
+    max-width: 100% !important;
     background: var(--color-primary) !important;
     color: #fff !important;
     border: none !important;
     border-radius: var(--radius-full) !important;
     font-family: var(--font-body) !important;
-    font-weight: 500 !important;
-    padding: 8px 24px !important;
+    font-weight: 600 !important;
+    font-size: 18px !important;
+    padding: 16px 32px !important;
     cursor: pointer !important;
-    box-shadow: 0 2px 8px rgba(224,100,56,0.3) !important;
+    box-shadow: 0 4px 16px rgba(224,100,56,0.35) !important;
     transition: all var(--transition) !important;
+    margin-top: 16px !important;
 }
-.gr-button:hover,
-button.primary:hover, button.secondary:hover {
+.go-btn:hover, .go-btn button:hover {
     background: var(--color-primary-hover) !important;
-    box-shadow: 0 4px 16px rgba(224,100,56,0.4) !important;
+    box-shadow: 0 6px 24px rgba(224,100,56,0.5) !important;
     transform: translateY(-1px);
 }
 
-/* ─── FILE UPLOAD AREA ─── */
-/* Reset: undo any pill/button styles leaking into the upload component */
-.gr-file, .gr-file-preview, div[data-testid="file"],
-.upload-container, .file-preview, .file-drop,
-div[class*="upload"], div[class*="file-upload"],
-.gradio-container .upload-button,
-.gradio-container div[data-testid="file"] > div {
-    background: var(--color-surface) !important;
-    border: 1px dashed var(--color-primary) !important;
-    border-radius: 8px !important;
-    width: 100% !important;
-    max-width: 100% !important;
-    box-shadow: none !important;
-    padding: 16px !important;
-    transform: none !important;
-    transition: all var(--transition);
-}
-/* The small button inside file upload should stay styled but not pill-giant */
-.gr-file button, div[data-testid="file"] button,
-div[class*="upload"] button {
-    border-radius: var(--radius-full) !important;
-    padding: 6px 16px !important;
-    width: auto !important;
-    max-width: none !important;
-    border: none !important;
-}
-.gr-file:hover, div[data-testid="file"]:hover,
-div[class*="upload"]:hover {
-    border-color: var(--color-primary) !important;
-    background: var(--color-accent-soft) !important;
-}
-
-/* ─── MARKDOWN CONTENT ─── */
-.markdown-text, .prose, .md {
+/* ─── STATUS BAR ─── */
+.status-bar, .status-bar p, .status-bar span {
+    font-family: var(--font-body) !important;
+    font-style: normal !important;
+    font-size: 15px !important;
+    line-height: 1.6 !important;
     color: var(--color-text) !important;
+    text-align: center !important;
+    padding: 16px 0 !important;
+    min-height: 24px !important;
 }
-.markdown-text strong, .prose strong {
+.status-bar strong {
     color: var(--color-primary) !important;
+    font-weight: 600 !important;
 }
 
-/* ─── SCROLLBAR ─── */
-::-webkit-scrollbar { width: 6px; }
-::-webkit-scrollbar-track { background: var(--color-bg); }
-::-webkit-scrollbar-thumb { background: var(--color-surface-dynamic); border-radius: 3px; }
-
-/* ─── FOOTER & MISC GRADIO CHROME ─── */
-footer, .gradio-container > footer {
-    display: none !important;
+/* ─── STATUS VERB ANIMATION ─── */
+.status-verb {
+    display: inline-block;
+    animation: verb-in 400ms cubic-bezier(0.16, 1, 0.3, 1) both;
 }
-.gr-group, .gap, .row, .column {
-    background: transparent !important;
+@keyframes verb-in {
+    from { opacity: 0; transform: translateY(6px); filter: blur(2px); }
+    to   { opacity: 1; transform: translateY(0);   filter: blur(0); }
 }
 
-/* ─── SECTION CARDS (panel layout) ─── */
-.section-card {
+/* ─── RESULT CARD ─── */
+.result-card {
     background: var(--color-surface) !important;
     border: 1px solid var(--color-border) !important;
     border-radius: var(--radius-xl) !important;
-    padding: 20px 24px !important;
-    margin-bottom: 12px !important;
-    box-shadow: var(--shadow-sm) !important;
+    padding: 24px !important;
+    margin-top: 16px !important;
+    box-shadow: var(--shadow-md) !important;
+    animation: result-in 300ms var(--transition);
 }
-.section-card h3 {
-    margin-top: 0 !important;
-    margin-bottom: 12px !important;
+@keyframes result-in {
+    from { opacity: 0; transform: translateY(12px); }
+    to   { opacity: 1; transform: translateY(0); }
 }
-/* "What it's already doing" — elevated card for the primary result */
-.doing-card {
-    background: var(--color-surface-2) !important;
-    border-color: var(--color-primary-highlight) !important;
-}
-
-/* ─── CONTENT PLAN HEADING (inside "doing" section) ─── */
-.doing-card h1, .section-card h1,
-.doing-card h2, .section-card h2 {
+.result-heading h3 {
     font-family: var(--font-display) !important;
     font-style: italic !important;
     color: var(--color-primary) !important;
-    font-size: 1.75rem !important;
-    margin-bottom: 12px !important;
-    padding-bottom: 8px !important;
+    font-size: 1.5rem !important;
+    margin: 0 0 12px 0 !important;
     border-bottom: 1px solid var(--color-divider) !important;
+    padding-bottom: 8px !important;
 }
 
-/* ─── SUBTITLE ─── */
-.subtitle {
-    text-align: center !important;
-    color: var(--color-text-muted) !important;
-    margin-bottom: 24px !important;
-}
-
-/* ─── CAPTION CARD ─── */
-.caption-card {
-    background: var(--color-surface-2) !important;
-    border: 1px solid var(--color-primary) !important;
-    border-radius: var(--radius-xl) !important;
-    padding: 16px !important;
-    margin-top: 12px !important;
-    animation: caption-fade-in 300ms var(--transition);
-}
-
-@keyframes caption-fade-in {
-    from { opacity: 0; transform: translateY(8px); }
-    to   { opacity: 1; transform: translateY(0); }
-}
-
-.caption-card h3 {
-    color: var(--color-primary) !important;
-    font-family: 'Instrument Serif', Georgia, serif !important;
-    font-style: italic !important;
-}
-
-.caption-card textarea {
+/* Result text areas */
+.result-text textarea {
     background: var(--color-bg) !important;
     border: 1px solid var(--color-border) !important;
     border-radius: var(--radius-md) !important;
     color: var(--color-text) !important;
-    font-family: 'Satoshi', 'Inter', system-ui, sans-serif !important;
-    line-height: 1.6 !important;
+    font-family: var(--font-body) !important;
+    font-size: 15px !important;
+    line-height: 1.7 !important;
+    padding: 12px !important;
 }
-
-.caption-card textarea:focus {
+.result-text textarea:focus {
     border-color: var(--color-primary) !important;
     box-shadow: 0 0 0 2px var(--color-accent-soft) !important;
+    outline: none !important;
+}
+.result-text label {
+    color: var(--color-text-muted) !important;
+    font-size: 13px !important;
+    font-family: var(--font-body) !important;
 }
 
-.post-btn {
+/* ─── COPY BUTTON ─── */
+.copy-btn, .copy-btn button {
+    width: 100% !important;
+    background: var(--color-surface-2) !important;
+    color: var(--color-text) !important;
+    border: 1px solid var(--color-border) !important;
+    border-radius: var(--radius-full) !important;
+    font-family: var(--font-body) !important;
+    font-weight: 500 !important;
+    font-size: 14px !important;
+    padding: 10px 24px !important;
     margin-top: 8px !important;
+    box-shadow: none !important;
+    transition: all var(--transition) !important;
+}
+.copy-btn:hover, .copy-btn button:hover {
+    background: var(--color-accent-soft) !important;
+    border-color: var(--color-primary) !important;
+    color: var(--color-primary) !important;
 }
 
-@media (prefers-reduced-motion: reduce) {
-    .caption-card { animation: none !important; }
+/* ─── GLOBAL OVERRIDES ─── */
+/* All body text */
+p, li, span, div, td, th {
+    font-family: var(--font-body) !important;
 }
-
-/* ─── SELECTION ─── */
-::selection {
-    background: rgba(224,100,56,0.2);
+/* Muted labels */
+label, .label-wrap, small {
+    color: var(--color-text-muted) !important;
+    font-family: var(--font-body) !important;
 }
+/* Bold = orange */
+strong, b { color: var(--color-primary) !important; }
 
-/* ─── FOCUS RING ─── */
+/* Scrollbar */
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: var(--color-bg); }
+::-webkit-scrollbar-thumb { background: var(--color-surface-2); border-radius: 3px; }
+
+/* Selection */
+::selection { background: rgba(224,100,56,0.2); }
+
+/* Focus ring */
 :focus-visible {
     outline: 2px solid var(--color-primary) !important;
     outline-offset: 3px;
-    border-radius: var(--radius-sm);
+}
+
+/* Reduced motion */
+@media (prefers-reduced-motion: reduce) {
+    .result-card, .status-verb { animation: none !important; }
+    * { transition-duration: 0ms !important; }
 }

@@ -1,5 +1,4 @@
-"""panel.py — Gradio web UI. Reports, does not prompt."""
-import asyncio
+"""panel.py — Minimal OpenClay dashboard. Images → Instagram. Text → Twitter."""
 import json
 import time
 from pathlib import Path
@@ -12,200 +11,280 @@ except ImportError:
 BASE_DIR = Path(__file__).parent
 DATA_DIR = BASE_DIR / "data"
 QUEUE_DIR = BASE_DIR / "queue"
-_DEFAULT_DATA = {
-    "what_was_built": ["Setting up..."],
-    "what_its_doing": "Initializing OpenClay...",
-    "what_it_needs": [],
-    "drop_zone": {"label": "Tell me what to do", "action_type": "text_input"},
-    "queue_status": {"pending": 0, "completed": 0, "failed": 0},
-}
+
+# Load README once at startup, extract compact context for tweet generation
+_README_PATH = BASE_DIR / "README.md"
+_README_RAW = _README_PATH.read_text() if _README_PATH.exists() else ""
+
+def _build_context(raw: str) -> str:
+    if not raw: return "OpenClay is a local AI bootstrapper."
+    lines = raw.splitlines()[:40]
+    useful = [ln for ln in lines if ln.strip()
+              and not ln.strip().startswith(("```", "!["))]
+    return "\n".join(useful)[:1200]
+
+_README_CONTEXT = _build_context(_README_RAW)
+
+def _hide_all(status="", show_inputs=True):
+    vis_in = gr.update(visible=show_inputs)
+    return (status, "", "",
+            gr.update(visible=False), gr.update(visible=False),
+            gr.update(visible=False), "", gr.update(visible=False),
+            vis_in, vis_in, vis_in)
 
 
-def _load_panel_data() -> dict:
-    """Load current panel data from reporting module."""
-    try:
-        from reporting import get_panel_data
-        return get_panel_data()
-    except Exception:
-        return dict(_DEFAULT_DATA)
+def _handle_create_post(topic, files):
+    has_files = bool(files)
+    has_topic = bool(topic and topic.strip())
 
-
-def _format_built_section(items: list) -> str:
-    if not items:
-        return "*Setting up your stack...*"
-    return "\n".join(f"- {item}" for item in items)
-
-
-def _format_needs_section(needs: list) -> str:
-    if not needs:
-        return "*Nothing needed right now — you're all set.*"
-    return "\n".join(
-        f"- **{n.get('label', n.get('key', ''))}**"
-        f"{' (required)' if n.get('required') else ' (optional)'}"
-        for n in needs
-    )
-
-
-async def _handle_image_upload(files):
-    """Triggered on file upload — delegates to caption_handler."""
-    from caption_handler import handle_image_upload
-    return await handle_image_upload(files, gr)
-
-
-async def _handle_post_caption(caption: str, hashtags: str, files):
-    """Post caption + images — delegates to caption_handler."""
-    from caption_handler import handle_post_caption
-    return await handle_post_caption(caption, hashtags, files)
-
-
-async def _handle_drop_zone(text: str, files) -> str:
-    """Handle text-only submissions from the drop zone."""
-    try:
-        await asyncio.sleep(0)
-        if text and text.strip():
-            QUEUE_DIR.mkdir(parents=True, exist_ok=True)
-            task = {"source": "panel", "task_type": "profile_action",
-                    "payload": {"action": "generate_outline", "topic": text.strip()}}
-            with open(QUEUE_DIR / f"panel_{int(time.time())}.json", "w") as f:
-                json.dump(task, f)
-            return f"On it: \"{text.strip()[:60]}\" — working now."
-    except Exception as e:
-        return f"Error: {e}"
-    return "Drop images or type something to get started."
-
-
-def _handle_undo() -> str:
-    """Undo the last agent action."""
-    try:
-        path = BASE_DIR / "agent_decisions.md"
-        if path.exists():
-            lines = path.read_text().splitlines(keepends=True)
-            if lines:
-                path.write_text("".join(lines[:-1]))
-                return f"Undone: {lines[-1].strip()}"
-        return "Nothing to undo."
-    except Exception as e:
-        return f"Undo failed: {e}"
-
-
-def _stream_doing_section():
-    """Stream the doing content token-by-token."""
-    output_path = DATA_DIR / "first_action_output.md"
-    if not output_path.exists():
-        yield "*Setting up your workspace...*"
+    if not has_files and not has_topic:
+        yield _hide_all()
         return
-    content = output_path.read_text()
-    acc = ""
-    for ch in content:
-        acc += ch
-        yield acc
-        time.sleep(0.018)
+
+    # ── IMAGES PATH: Instagram caption ──
+    if has_files:
+        yield from _instagram_flow(topic, files)
+        return
+
+    # ── TEXT-ONLY PATH: Tweet draft ──
+    yield from _twitter_flow(topic.strip())
 
 
-def _handle_ig_connect():
-    from oauth import connect_instagram
-    return connect_instagram()
+def _verb(text: str) -> str:
+    """Wrap a status verb in the animated span markup."""
+    return f'<span class="status-verb">{text}</span>'
 
 
-def _handle_ig_creds(app_id, app_secret):
-    from oauth import save_app_credentials
-    return save_app_credentials(app_id, app_secret)
+def _instagram_flow(topic, files):
+    import shutil
+    IMAGE_EXTS = {".jpg", ".jpeg", ".png", ".gif", ".webp", ".heic", ".heif"}
+    inbox = BASE_DIR / "inbox"
+    inbox.mkdir(parents=True, exist_ok=True)
+    image_paths, names = [], []
 
+    yield _hide_all(_verb("Reading your images..."))
 
-def _get_ig_status() -> str:
+    if not isinstance(files, list):
+        files = [files]
+    for f in files:
+        src = Path(str(f))
+        dest = inbox / src.name
+        try:
+            shutil.copy2(str(src), str(dest))
+            names.append(src.name)
+            if src.suffix.lower() in IMAGE_EXTS:
+                image_paths.append(str(dest))
+        except Exception as e:
+            yield _hide_all(f"**Error:** Could not copy {src.name} — {e}")
+            return
+
+    n_img = len(image_paths)
+    if not image_paths:
+        yield _hide_all("**Error:** No image files found. Drop .jpg, .png, or .webp.")
+        return
+
+    yield _hide_all(_verb("Finding the story..."))
+
     try:
-        from oauth import check_instagram_ready
-        s = check_instagram_ready()
-        if s["connected"]:
-            return "**Instagram:** Connected"
-        if s["app_configured"]:
-            return "**Instagram:** App configured — click Connect to authorize"
-        return "**Instagram:** Not configured"
-    except Exception:
-        return "**Instagram:** Not configured"
+        from vision_caption import generate_caption_from_images
+        result = generate_caption_from_images(image_paths)
+    except Exception as e:
+        yield _hide_all(f"**Error:** Vision model failed — {e}")
+        return
 
+    if result.get("error"):
+        yield _hide_all(f"**Error:** {result['error']}")
+        return
 
-def _refresh_panel():
-    data = _load_panel_data()
-    return (
-        _format_built_section(data["what_was_built"]),
-        data["what_its_doing"],
-        _format_needs_section(data["what_it_needs"]),
+    yield _hide_all(_verb("Writing..."))
+    time.sleep(0.4)
+
+    caption = result.get("caption", "")
+    hashtags = result.get("hashtags", "")
+    model = result.get("model", "vision")
+
+    full_caption = f"{caption}\n\n{hashtags}" if hashtags else caption
+    QUEUE_DIR.mkdir(parents=True, exist_ok=True)
+    task = {
+        "source": "panel", "task_type": "instagram_post",
+        "payload": {
+            "action": "carousel_post" if n_img > 1 else "single_post",
+            "caption": full_caption, "images": image_paths,
+        },
+    }
+    with open(QUEUE_DIR / f"ig_post_{int(time.time()*1000)}.json", "w") as fh:
+        json.dump(task, fh)
+
+    _v = gr.update(visible=False)
+    yield (
+        _verb("Done."),
+        caption, hashtags,
+        gr.update(visible=True), gr.update(visible=True),
+        _v, "", _v,
+        _v, _v, _v,
     )
+
+
+_STRIP_PREFIXES = ("tweet:", "here's", "here is", "sure!", "sure,",
+                   "of course", "absolutely", "here you go")
+_STRIP_STARTS = ("would you", "do you", "should i", "let me know",
+                 "want me", "shall i", "feel free", "i can also")
+
+def _clean_tweet(raw: str) -> str:
+    t = raw.strip()
+    if (t.startswith('"') and t.endswith('"')) or (t.startswith("'") and t.endswith("'")):
+        t = t[1:-1].strip()
+    low = t.lower()
+    for pfx in _STRIP_PREFIXES:
+        if low.startswith(pfx):
+            t = t[len(pfx):].strip().lstrip(":").lstrip(",").strip()
+            low = t.lower()
+    return "\n".join(ln for ln in t.splitlines()
+                     if not any(ln.strip().lower().startswith(q) for q in _STRIP_STARTS)
+                     ).strip()[:280]
+
+
+def _twitter_flow(topic: str):
+    yield _hide_all(_verb("Reading your intention..."))
+    time.sleep(0.6)
+    yield _hide_all(_verb("Thinking..."))
+    try:
+        from agent_backend import generate
+        raw = generate(
+            f"ABOUT OPENCLAY:\n{_README_CONTEXT}\n\n---\n\n"
+            f"Topic: {topic}\n\n"
+            "Write exactly ONE tweet. Max 280 chars. 1-2 hashtags.\n"
+            "RULES: Output ONLY the tweet. No quotes. No labels. "
+            "No questions. No planning.\n"
+            "Use real facts about OpenClay from above. Just the tweet text.\n"
+        )
+    except Exception as e:
+        yield _hide_all(f"**Error:** {e}")
+        return
+    # Post-LLM verb sequence — each gets real screen time
+    yield _hide_all(_verb("Drafting..."))
+    time.sleep(0.8)
+    yield _hide_all(_verb("Sharpening..."))
+    time.sleep(0.6)
+    tweet = _clean_tweet(raw)
+    if not tweet:
+        yield _hide_all("**Error:** Could not generate tweet. Try again.")
+        return
+    # Show draft, hide all input elements
+    _v = gr.update(visible=False)
+    yield (
+        _verb("Draft ready."),
+        "", "",
+        _v, _v,
+        gr.update(visible=True), tweet, gr.update(visible=True),
+        _v, _v, _v,
+    )
+
+
+def _handle_confirm_tweet(tweet_text):
+    _show = gr.update(visible=True)
+    _hide = gr.update(visible=False)
+    def _out(msg):
+        return (msg, _hide, _hide, _show, _show, _show)
+    if not tweet_text or not tweet_text.strip():
+        return _out("**Error:** No tweet text.")
+    from twitter_post import check_twitter_ready, post_tweet
+    if not check_twitter_ready():
+        return _out(
+            "**Error:** Twitter credentials not set. "
+            "Add TWITTER_API_KEY/SECRET + ACCESS_TOKEN/SECRET to .env"
+        )
+    result = post_tweet(tweet_text.strip())
+    if result.get("success"):
+        tid = result.get("tweet_id", "")
+        return _out(f"**Posted.** Tweet ID: {tid}")
+    return _out(f"**Error:** {result.get('error', 'Unknown error')}")
+
+
+def _copy_text(caption, hashtags):
+    return f"{caption}\n\n{hashtags}" if hashtags.strip() else caption
 
 
 def _load_css() -> str:
-    css_path = BASE_DIR / "theme.css"
-    return css_path.read_text() if css_path.exists() else ""
+    p = BASE_DIR / "theme.css"
+    return p.read_text() if p.exists() else ""
 
 
 def build_panel() -> "gr.Blocks":
-    """Build the Gradio interface."""
     if gr is None:
         raise ImportError("gradio not installed — run: pip3 install gradio")
-    data = _load_panel_data()
+
     with gr.Blocks(title="OpenClay") as panel:
-        gr.Markdown("# OpenClay", elem_classes=["main-header"])
-        gr.Markdown("*Your local AI infrastructure — running now.*", elem_classes=["subtitle"])
-        with gr.Row():
-            with gr.Column():
-                with gr.Group(elem_classes=["section-card"]):
-                    gr.Markdown("### What was built")
-                    built_display = gr.Markdown(_format_built_section(data["what_was_built"]))
-                with gr.Group(elem_classes=["section-card"]):
-                    gr.Markdown("### What it needs from you")
-                    needs_display = gr.Markdown(_format_needs_section(data["what_it_needs"]))
-                with gr.Group(elem_classes=["section-card"]):
-                    gr.Markdown("### Connections")
-                    ig_status = gr.Markdown(_get_ig_status())
-                    ig_btn = gr.Button("Connect Instagram", variant="primary", size="sm")
-                    ig_result = gr.Markdown("")
-                    ig_btn.click(_handle_ig_connect, outputs=[ig_result])
-                    with gr.Accordion("Instagram app setup", open=False):
-                        gr.Markdown("*One-time: paste your App ID and Secret from developers.facebook.com*")
-                        ig_id = gr.Textbox(label="App ID", placeholder="Instagram App ID")
-                        ig_sec = gr.Textbox(label="App Secret", placeholder="Instagram App Secret", type="password")
-                        ig_save = gr.Button("Save credentials", variant="secondary", size="sm")
-                        ig_save_res = gr.Markdown("")
-                        ig_save.click(_handle_ig_creds, inputs=[ig_id, ig_sec], outputs=[ig_save_res])
-            with gr.Column():
-                with gr.Group(elem_classes=["section-card", "doing-card"]):
-                    gr.Markdown("### What it's already doing")
-                    doing_display = gr.Markdown(data["what_its_doing"])
-                    s_btn = gr.Button("Stream result", variant="secondary", size="sm")
-                    s_btn.click(_stream_doing_section, outputs=[doing_display])
-                with gr.Group(elem_classes=["section-card"]):
-                    gr.Markdown("### Your move")
-                    lbl = data["drop_zone"].get("label", "Type or drop something here")
-                    drop_text = gr.Textbox(label=lbl, placeholder=lbl, lines=2)
-                    drop_file = gr.File(label="Drop images for Instagram", file_count="multiple")
-                    drop_result = gr.Markdown("")
-                    with gr.Group(visible=False, elem_classes=["section-card", "caption-card"]) as cap_grp:
-                        gr.Markdown("### Caption Preview")
-                        cap_analysis = gr.Markdown("")
-                        cap_box = gr.Textbox(label="Caption", placeholder="Your generated caption...",
-                                             lines=5, interactive=True)
-                        hash_box = gr.Textbox(label="Hashtags", placeholder="#tennis #fastcourt ...",
-                                              lines=2, interactive=True)
-                    post_btn = gr.Button("Post to Instagram", variant="primary",
-                                         visible=False, elem_classes=["post-btn"])
-                    post_res = gr.Markdown("")
-                    drop_file.change(_handle_image_upload, inputs=[drop_file],
-                                     outputs=[cap_grp, cap_box, hash_box, cap_analysis, post_btn, drop_result])
-                    post_btn.click(_handle_post_caption, inputs=[cap_box, hash_box, drop_file], outputs=[post_res])
-                    go_btn = gr.Button("Go", variant="primary")
-                    go_btn.click(_handle_drop_zone, inputs=[drop_text, drop_file], outputs=[drop_result])
-        with gr.Row():
-            undo_btn = gr.Button("Undo last action", variant="secondary", size="sm")
-            undo_res = gr.Markdown("")
-            undo_btn.click(_handle_undo, outputs=[undo_res])
-            ref_btn = gr.Button("Refresh", variant="secondary", size="sm")
-            ref_btn.click(_refresh_panel, outputs=[built_display, doing_display, needs_display])
+        gr.Markdown("# *OpenClay*", elem_classes=["app-title"])
+        gr.Markdown(
+            "Drop images or describe what to post.",
+            elem_classes=["app-sub"],
+        )
+
+        # Drop zone
+        drop_file = gr.File(
+            label="Drop your images here",
+            file_count="multiple", elem_classes=["drop-zone"],
+        )
+
+        # Topic
+        topic_box = gr.Textbox(
+            label="What do you want to tweet about?",
+            placeholder="e.g. announce OpenClay exists, match day energy, Sunday doubles...",
+            lines=1, elem_classes=["topic-input"],
+        )
+
+        # Go
+        go_btn = gr.Button("Create & Post", variant="primary",
+                           elem_classes=["go-btn"])
+
+        # Status
+        status_md = gr.Markdown("", elem_classes=["status-bar"])
+
+        # ── Instagram result card ──
+        with gr.Group(visible=False, elem_classes=["result-card"]) as result_grp:
+            gr.Markdown("### Instagram Caption", elem_classes=["result-heading"])
+            caption_box = gr.Textbox(label="Caption", lines=6,
+                                     interactive=True, elem_classes=["result-text"])
+            hashtag_box = gr.Textbox(label="Hashtags", lines=2,
+                                     interactive=True, elem_classes=["result-text"])
+        copy_btn = gr.Button("Copy to Clipboard", variant="secondary",
+                             visible=False, elem_classes=["copy-btn"])
+
+        # ── Twitter draft card ──
+        with gr.Group(visible=False, elem_classes=["result-card"]) as tweet_grp:
+            gr.Markdown("### Tweet Draft", elem_classes=["result-heading"])
+            tweet_box = gr.Textbox(label="Tweet", lines=3,
+                                   interactive=True, elem_classes=["result-text"],
+                                   max_lines=4)
+        confirm_btn = gr.Button("Confirm & Post to Twitter", variant="primary",
+                                visible=False, elem_classes=["go-btn"])
+        tweet_status = gr.Markdown("", elem_classes=["status-bar"])
+
+        # Wire: main flow
+        go_btn.click(
+            _handle_create_post,
+            inputs=[topic_box, drop_file],
+            outputs=[status_md, caption_box, hashtag_box,
+                     result_grp, copy_btn,
+                     tweet_grp, tweet_box, confirm_btn,
+                     drop_file, topic_box, go_btn],
+        )
+
+        # Wire: copy
+        copy_output = gr.Textbox(visible=False)
+        copy_btn.click(_copy_text, inputs=[caption_box, hashtag_box],
+                       outputs=[copy_output])
+
+        # Wire: confirm tweet — posts, then restores input UI
+        confirm_btn.click(_handle_confirm_tweet, inputs=[tweet_box],
+                          outputs=[tweet_status, tweet_grp, confirm_btn,
+                                   drop_file, topic_box, go_btn])
+
     return panel
 
 
 def launch(share: bool = False):
-    """Launch the panel in the browser."""
     panel = build_panel()
     panel.launch(server_name="127.0.0.1", server_port=7861, share=share,
                  inbrowser=True, show_error=True, css=_load_css())
