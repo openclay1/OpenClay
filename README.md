@@ -6,6 +6,12 @@ You describe what you want. OpenClay reads your machine, builds a local AI stack
 ![OpenClay demo](https://via.placeholder.com/800x400?text=demo+GIF+goes+here)
 
 ```bash
+pip install openclay-agent
+```
+
+Or from source:
+
+```bash
 git clone https://github.com/openclay1/OpenClay.git && cd OpenClay && pip3 install -r requirements.txt && python3 app.py
 ```
 
