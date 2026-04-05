@@ -1,224 +1,134 @@
 # *OpenClay*
 
-**Your intention becomes infrastructure.**
+You describe what you want done. It executes.
 
-OpenClay is a universal local AI bootstrapper. You tell it what you want to do — it detects your hardware, picks the right tools, installs everything silently, takes the first autonomous action, and launches a live panel. No configuration. No tutorials. No consulting.
+OpenClay is a local AI agent bootstrapper. It detects your hardware, installs the right open-source models, and runs the workflow — on your machine, forever. No cloud. No subscription. No API costs.
+
+Twitter posting was the first proof the pipeline works. But OpenClay is not a Twitter tool. It's not a content tool. It's a general-purpose local agent that takes an intention and acts on it.
+
+You point it at a problem. It figures out what it needs, installs it, and goes.
 
 ---
 
-## Quickstart
+## Quick Start
 
 ```bash
-# Clone
 git clone https://github.com/openclay1/OpenClay.git
 cd OpenClay
-
-# Install dependencies
 pip3 install -r requirements.txt
-
-# Run
 python3 app.py
 ```
 
-OpenClay will detect your hardware, ask up to 3 questions, set up your stack, and open a Gradio panel at `http://127.0.0.1:7861`.
+The browser opens. You see a blinking cursor. Type what you want to build.
+
+---
+
+## Honest Status
+
+This is an early build. It works — it posted its own launch tweet on April 4, 2026 using itself. But it's raw. Expect rough edges, missing features, and things that break. If you're the kind of person who builds anyway, this is for you.
+
+What works today:
+- Hardware detection → automatic model selection via Ollama
+- Tweet drafting and posting via local LLM + Tweepy
+- Image analysis and Instagram captions via local llava vision model
+- Wiki memory layer that compounds knowledge across sessions
+- Dual agent backend (Claw Code tool-use loop / Claude Code generation)
+
+What's coming:
+- Video workflows
+- Research and monitoring pipelines
+- Data ingestion and generation
+- Whatever you point it at — it's a bootstrapper, not a product
 
 ---
 
 ## How It Works
 
 ```
-You say what you want
-        ↓
-  Hardware detection (introspect.py)
-        ↓
-  3-exchange conversational intake (intake.py)
-        ↓
-  Profile + tool selection (selector.py)
-        ↓
-  Silent installation (installer.py)
-        ↓
-  First autonomous action (first_action.py)
-        ↓
-  Live Gradio panel (panel.py)
+You type an intention
+       ↓
+Hardware detection → picks the right model for your machine
+       ↓
+Silent installation → installs what it needs, no questions
+       ↓
+Execution → does the thing
+       ↓
+Wiki memory → logs what it did, compounds over time
 ```
 
-### Profiles
-
-| Profile      | Who it's for                        | What it builds                         |
-|-------------|-------------------------------------|----------------------------------------|
-| **Creator** | Content creators, social managers    | Content pipeline, captions, scheduling |
-| **Researcher** | Academics, analysts, knowledge workers | Knowledge base, document ingestion   |
-| **Operator** | Business owners, automation seekers | Workflow automation, task pipelines     |
-| **Builder** | Developers, makers                   | Project scaffold, dev environment       |
+Everything runs locally through Ollama. No data leaves your machine.
 
 ---
 
-## Agent Backend Architecture
+## Memory
 
-OpenClay supports two switchable agent engines. Set `AGENT_BACKEND` in `.env`:
+OpenClay maintains a local wiki (`wiki/`) that it reads and writes itself. Every tweet posted, every source ingested, every operation logged. The wiki is the agent's memory — it compounds over time so the agent gets better the more you use it.
 
-```bash
-# Local-first agent loop with tool use (default)
-AGENT_BACKEND=clawcode
-
-# Simple generation via Ollama CLI
-AGENT_BACKEND=claudecode
-```
-
-### Claw Code Backend (`clawcode`)
-
-Inspired by [Claw Code](https://github.com/instructkr/claw-code) — the open-source, provider-agnostic agent framework. This backend runs a full **tool-use agent loop** over Ollama's `/api/chat` endpoint:
-
-1. Prompt sent to local Ollama model
-2. Model can invoke tools: `write_file`, `read_file`, `run_command`, `list_files`
-3. Tool results fed back into the conversation
-4. Loop iterates up to 5 turns until the model returns a final answer
-5. All execution sandboxed to the project directory
-
-**Entirely local. No API keys. No cloud calls. Free.**
-
-```
-User prompt → Ollama /api/chat (with tools) → tool call → execute → feed back → repeat → final answer
-```
-
-### Claude Code Backend (`claudecode`)
-
-The original simple path — sends prompts to Ollama via subprocess (`ollama run <model>`) with a urllib `/api/chat` fallback. No tool use, just single-turn generation.
-
-### How the switch works
-
-All modules (`agent.py`, `first_action.py`, `*_profile.py`) call a single function:
-
-```python
-from agent_backend import generate
-result = generate("your prompt here")
-```
-
-`agent_backend.py` reads `AGENT_BACKEND` from `.env` and routes to the correct engine. Swap backends anytime by changing one line in `.env` — no code changes needed.
+This follows the pattern Karpathy described on April 4, 2026: LLM-maintained persistent knowledge bases. The difference is that OpenClay's wiki isn't for you — it's for the agent, so it can act with consistency.
 
 ---
 
 ## Hardware Tiers
 
-OpenClay auto-detects your machine and selects the right Ollama model:
+OpenClay reads your machine and picks the right model:
 
-| Tier        | Requirements                          | Model                            |
-|-------------|---------------------------------------|----------------------------------|
-| **Large**   | 32GB+ RAM, Apple Silicon or 6GB+ VRAM | `llama3:8b`                      |
-| **Medium**  | 16GB+ RAM, Apple Silicon/CUDA/4GB+ VRAM | `qwen2.5:7b`                  |
-| **Medium-Low** | 16GB+ RAM, Intel, no dedicated GPU | `qwen2.5:3b-instruct-q4_K_M`    |
-| **Small**   | 8GB+ RAM                              | `qwen2.5:1.5b`                  |
-| **Template**| Under 8GB                             | No model (template-only mode)    |
-
----
-
-## Vision-Powered Captions
-
-Drop images into the panel and OpenClay generates Instagram captions automatically using local vision:
-
-1. **Primary:** Ollama `llava` (local, free)
-2. **Fallback:** Claude claude-opus-4-5 (if `ANTHROPIC_API_KEY` is set)
-3. **Fallback:** GPT-4o (if `OPENAI_API_KEY` is set)
-4. **Last resort:** Ollama text-only (no vision, filename-based)
-
-Captions appear in an editable textbox — tweak and hit Post.
+| Your hardware | What it runs |
+|---|---|
+| 32GB+ RAM, Apple Silicon / 6GB+ VRAM | `llama3:8b` |
+| 16GB+ RAM, Apple Silicon / CUDA | `qwen2.5:7b` |
+| 16GB+ RAM, Intel, no GPU | `qwen2.5:3b-instruct-q4_K_M` |
+| 8GB+ RAM | `qwen2.5:1.5b` |
+| Under 8GB | Template-only mode |
 
 ---
 
-## Instagram Integration
+## Configuration
 
-One-click OAuth via the Gradio panel:
+Copy `.env.example` to `.env` and fill in what you need:
 
-1. Click **Connect Instagram**
-2. Authorize in the browser
-3. Token saved automatically to `.env`
-4. Drop images → auto-caption → Post
+```bash
+AGENT_BACKEND=clawcode    # or claudecode
+TWITTER_API_KEY=           # optional — only if you want to post
+TWITTER_API_SECRET=
+TWITTER_ACCESS_TOKEN=
+TWITTER_ACCESS_TOKEN_SECRET=
+```
 
-Uses Facebook Business Login (Graph API v21.0) with scopes: `pages_show_list`, `pages_read_engagement`, `instagram_basic`, `instagram_content_publish`.
+Most things work with zero configuration. The agent picks its own model and installs its own tools.
 
 ---
 
 ## Project Structure
 
 ```
-app.py                  # Orchestrator (zero business logic)
-introspect.py           # Hardware detection
-intake.py               # Conversational onboarding (max 3 exchanges)
-intake_analysis.py      # Archetype + intent classification
-selector.py             # Profile + tool selection
-installer.py            # Silent OS-aware installation
-agent.py                # Core autonomous loop (queue → execute)
-agent_backend.py        # Switchable backend: Claw Code / Claude Code
-first_action.py         # First autonomous action
-panel.py                # Gradio web UI
-theme.css               # Design system (matches landing page)
-oauth.py                # Instagram OAuth flow
-vision_caption.py       # Image analysis + caption generation
-caption_handler.py      # Upload → caption → post workflow
-creator_profile.py      # Content creator profile module
-researcher_profile.py   # Research profile module
-operator_profile.py     # Automation profile module
-builder_profile.py      # Builder profile module
-reporting.py            # Panel data + status reporting
-config.json             # Global configuration
-profiles/*.json         # Profile configurations
+app.py              — entry point, sequences everything
+panel.py            — browser UI (Gradio)
+agent_backend.py    — switchable LLM backend
+wiki_engine.py      — persistent wiki memory
+vision_caption.py   — local image analysis (llava)
+twitter_post.py     — tweet posting (Tweepy)
+introspect.py       — hardware detection
+installer.py        — silent tool installation
+theme.css           — design system
+openclay.md         — wiki schema / brand brain
+wiki/               — agent's compounding memory
 ```
 
-### Module Rules
-
-- Every module stays under **300 lines**
-- Modules communicate only through `/queue` folder (JSON) and SQLite
-- Zero business logic in `app.py`
-- The Anti-Consultant Rule: act, don't ask
-
----
-
-## Design System
-
-OpenClay uses a full token-based design system defined in `CLAUDE.md` and `theme.css`:
-
-- **Colors:** Dark theme with `--color-primary: #e06438` (warm orange accent)
-- **Typography:** Instrument Serif (headings) + Satoshi (body/UI)
-- **Components:** Pill buttons, bordered cards, dashed drop zones
-- **All values via CSS custom properties** — never hardcoded hex
-
----
-
-## Configuration
-
-**`.env`** — secrets and backend selection:
-```bash
-AGENT_BACKEND=clawcode          # or claudecode
-INSTAGRAM_APP_ID=...            # Facebook App ID
-INSTAGRAM_APP_SECRET=...        # Facebook App Secret
-# ANTHROPIC_API_KEY=...         # Optional: Claude vision fallback
-# OPENAI_API_KEY=...            # Optional: GPT-4o vision fallback
-```
-
-**`config.json`** — global settings:
-```json
-{
-  "demo_mode": false,
-  "panel_port": 7861,
-  "max_intake_exchanges": 3,
-  "confidence_threshold": 0.7,
-  "max_module_lines": 300
-}
-```
+Every module stays under 300 lines. Modules talk through `queue/` (JSON) and SQLite — no direct imports for business logic.
 
 ---
 
 ## Principles
 
-See [AGENT_PRINCIPLES.md](AGENT_PRINCIPLES.md) for the four governing rules:
-
-1. **Anti-Consultant** — never make the user do something the agent can do
-2. **OAuth-First** — one-click browser flow for every platform connection
-3. **Capability Acquisition** — if a tool is missing, install it silently
-4. **No Half-Outputs** — every result must be actionable and complete
+1. **Act, don't ask** — if the agent can do it, it does it
+2. **Local-first** — no cloud dependency for core function
+3. **Install what's missing** — if a tool isn't there, get it silently
+4. **No half-outputs** — every result must be complete and actionable
 
 ---
 
 ## License
 
-MIT
+MIT — it's yours, do what you want with it.
+
+github.com/openclay1/OpenClay

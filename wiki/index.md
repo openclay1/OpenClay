@@ -1,18 +1,26 @@
+---
 title: Wiki Index
-updated: 2026-04-04
+updated: 2026-04-05
+---
 
-# OpenClay Wiki
+# Wiki Index
 
-Auto-generated catalog of all wiki pages. Do not edit manually.
+Auto-generated catalog.
 
-## Brand
-- [voice.md](brand/voice.md) — tone, vocabulary, hashtag rules
+## Concepts
+_No concepts yet._
 
-## Posts
-_No posts yet._
+## Entities
+_No entities yet._
+
+## Sources
+_No sources yet._
+
+## Comparisons
+_No comparisons yet._
 
 ## Topics
 _No topics yet._
 
-## Sources
-_No sources yet._
+## Posts
+_No posts yet._

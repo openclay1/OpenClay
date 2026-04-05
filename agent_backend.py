@@ -1,14 +1,4 @@
-"""
-agent_backend.py — Switchable agent backend for OpenClay.
-Supports two engines, configured via AGENT_BACKEND in .env:
-
-  clawcode   — Claw Code style: Ollama chat API with tool-use loop (local, free)
-  claudecode — Original path: Ollama CLI generate (simple, no tool use)
-
-Claw Code (github.com/instructkr/claw-code) is an open-source agent framework.
-Our integration mirrors its architecture: provider-agnostic tool-use loop over
-Ollama's /api/chat endpoint, with structured tool calls and iterative execution.
-"""
+"""agent_backend.py — Switchable agent backend (clawcode / claudecode via Ollama)."""
 from __future__ import annotations
 
 import json
@@ -257,17 +247,49 @@ def _claudecode_generate(prompt: str, model: str) -> str:
 
 # ── Public API ──
 
+def _inject_memory(prompt: str) -> str:
+    """Prepend AGENTS.md context to the prompt if available."""
+    try:
+        from memory import load_memory_context
+        ctx = load_memory_context()
+        if ctx:
+            return f"AGENT MEMORY:\n{ctx}\n\n---\n\n{prompt}"
+    except Exception:
+        pass
+    return prompt
+
+
 def generate(prompt: str, model: str | None = None) -> str:
     """Generate text using the configured backend.
 
+    Reads AGENTS.md before every call. Logs outcome after.
     This is the single entry point all modules should use.
     """
     if model is None:
         model = get_model()
     backend = get_backend()
-    if backend == "clawcode":
-        return _clawcode_generate(prompt, model)
-    return _claudecode_generate(prompt, model)
+    full_prompt = _inject_memory(prompt)
+    try:
+        if backend == "clawcode":
+            result = _clawcode_generate(full_prompt, model)
+        else:
+            result = _claudecode_generate(full_prompt, model)
+        # Silent success logging
+        try:
+            from memory import record_success
+            short = prompt[:80].replace("\n", " ")
+            record_success(f"generate({backend})", model, short)
+        except Exception:
+            pass
+        return result
+    except Exception as e:
+        # Silent failure logging
+        try:
+            from memory import record_failure
+            record_failure(f"generate({backend})", str(e)[:200])
+        except Exception:
+            pass
+        raise
 
 
 def generate_with_tools(prompt: str, model: str | None = None,

@@ -26,6 +26,17 @@ content/
 knowledge_base/
 project/
 agent_decisions.md
+progress.txt
+
+# Wiki — user data stays local
+raw/
+wiki/posts/
+wiki/sources/
+wiki/topics/
+wiki/concepts/
+wiki/entities/
+wiki/comparisons/
+wiki/log.md
 
 # IDE
 .vscode/
