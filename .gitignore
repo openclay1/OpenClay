@@ -43,3 +43,6 @@ wiki/log.md
 .idea/
 *.swp
 *.swo
+dist/
+*.egg-info/
+build/

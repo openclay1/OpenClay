@@ -73,7 +73,10 @@
       "Bash(pip3 show:*)",
       "Bash(python3 -c \"import py_compile; py_compile.compile\\(''app.py'', doraise=True\\); py_compile.compile\\(''panel.py'', doraise=True\\); print\\(''OK''\\)\")",
       "Bash(python3 -c \"import py_compile; py_compile.compile\\(''agent_backend.py'', doraise=True\\); print\\(''OK''\\)\")",
-      "Bash(python3 -c \"import py_compile; py_compile.compile\\(''panel.py'', doraise=True\\); print\\(''OK''\\)\")"
+      "Bash(python3 -c \"import py_compile; py_compile.compile\\(''panel.py'', doraise=True\\); print\\(''OK''\\)\")",
+      "Bash(ls \"/Users/no_ta/Desktop/Open Clay/\"*.py)",
+      "Bash(/Users/no_ta/Library/Python/3.9/bin/pyproject-build)",
+      "Bash(/Users/no_ta/Library/Python/3.9/bin/twine upload:*)"
     ]
   }
 }
