@@ -1,15 +1,6 @@
-"""
-vision_caption.py — Analyze images with a vision model and generate
-Instagram carousel captions in the Fast Court Tennis style.
-Primary: Ollama llava/llava-llama3 (local, free). Fallback: Claude/GPT-4o.
-"""
+"""vision_caption.py — Vision-based caption generation. Ollama llava → Claude → GPT-4o."""
 from __future__ import annotations
-
-import base64
-import json
-import mimetypes
-import os
-import sqlite3
+import base64, json, mimetypes, os, sqlite3
 from pathlib import Path
 
 BASE_DIR = Path(__file__).parent
@@ -142,9 +133,12 @@ def _generate_via_claude(paths: list[Path], api_key: str) -> dict:
         content.append({"type": "image", "source": {"type": "base64", "media_type": mime, "data": b64}})
     content.append({"type": "text", "text": CAPTION_PROMPT})
     try:
-        resp = anthropic.Anthropic(api_key=api_key).messages.create(
-            model="claude-opus-4-5-20250918", max_tokens=1024,
-            messages=[{"role": "user", "content": content}])
+        from retry_ext import retry_call
+        client = anthropic.Anthropic(api_key=api_key)
+        resp = retry_call(client.messages.create,
+                          model="claude-opus-4-5-20250918", max_tokens=1024,
+                          messages=[{"role": "user", "content": content}],
+                          label="claude-vision")
         return _parse_caption_response(resp.content[0].text)
     except Exception as e:
         return {"error": f"Claude API error: {e}"}
@@ -161,9 +155,12 @@ def _generate_via_openai(paths: list[Path], api_key: str) -> dict:
         b64, mime = _encode_image(p)
         content.append({"type": "image_url", "image_url": {"url": f"data:{mime};base64,{b64}"}})
     try:
-        resp = openai.OpenAI(api_key=api_key).chat.completions.create(
-            model="gpt-4o", max_tokens=1024,
-            messages=[{"role": "user", "content": content}])
+        from retry_ext import retry_call
+        client = openai.OpenAI(api_key=api_key)
+        resp = retry_call(client.chat.completions.create,
+                          model="gpt-4o", max_tokens=1024,
+                          messages=[{"role": "user", "content": content}],
+                          label="openai-vision")
         return _parse_caption_response(resp.choices[0].message.content)
     except Exception as e:
         return {"error": f"OpenAI API error: {e}"}
@@ -177,7 +174,9 @@ def _detect_llava_model() -> str | None:
     """Check which llava model is available locally."""
     try:
         import requests
-        resp = requests.get(f"{OLLAMA_URL}/api/tags", timeout=5)
+        from retry_ext import retry_call
+        resp = retry_call(requests.get, f"{OLLAMA_URL}/api/tags", timeout=5,
+                          label="ollama-tags")
         if resp.status_code != 200:
             return None
         models = resp.json().get("models", [])
@@ -189,10 +188,8 @@ def _detect_llava_model() -> str | None:
 
 def _generate_via_ollama_vision(paths: list[Path]) -> dict:
     """Primary: generate caption with Ollama llava vision model."""
-    try:
-        import requests
-    except ImportError:
-        return {"error": "requests not installed"}
+    try: import requests
+    except ImportError: return {"error": "requests not installed"}
 
     model = _detect_llava_model()
     if not model:
@@ -205,15 +202,12 @@ def _generate_via_ollama_vision(paths: list[Path]) -> dict:
         images_b64.append(b64)
 
     try:
-        resp = requests.post(
-            f"{OLLAMA_URL}/api/generate",
-            json={
-                "model": model,
-                "prompt": CAPTION_PROMPT,
-                "images": images_b64,
-                "stream": False,
-            },
-            timeout=120,
+        from retry_ext import retry_call
+        resp = retry_call(
+            requests.post, f"{OLLAMA_URL}/api/generate",
+            json={"model": model, "prompt": CAPTION_PROMPT,
+                  "images": images_b64, "stream": False},
+            timeout=120, label="ollama-vision",
         )
         if resp.status_code == 200:
             text = resp.json().get("response", "")
@@ -229,10 +223,8 @@ def _generate_via_ollama_vision(paths: list[Path]) -> dict:
 
 def _generate_via_ollama_text(paths: list[Path]) -> dict:
     """Last resort: Ollama text-only caption (no vision)."""
-    try:
-        import requests
-    except ImportError:
-        return {"error": "requests not installed"}
+    try: import requests
+    except ImportError: return {"error": "requests not installed"}
 
     filenames = ", ".join(p.name for p in paths)
     prompt = (
@@ -242,11 +234,12 @@ def _generate_via_ollama_text(paths: list[Path]) -> dict:
         "Format:\n[CAPTION]\n(caption)\n\n[HASHTAGS]\n(15-20 hashtags)"
     )
     try:
-        resp = requests.post(
-            f"{OLLAMA_URL}/api/generate",
+        from retry_ext import retry_call
+        resp = retry_call(
+            requests.post, f"{OLLAMA_URL}/api/generate",
             json={"model": "qwen2.5:3b-instruct-q4_K_M", "prompt": prompt,
                   "stream": False},
-            timeout=60,
+            timeout=60, label="ollama-text-caption",
         )
         if resp.status_code == 200:
             text = resp.json().get("response", "")
@@ -283,17 +276,24 @@ def _parse_caption_response(text: str) -> dict:
         result["caption"] = text.strip()
 
     # Strip questions, planning, and reasoning the model might add
-    _STRIP = (
-        "would you like", "do you want", "should i", "let me know",
-        "shall i", "do you need", "want me to", "i can also", "feel free",
-        "here's what", "here is what", "step 1", "step 2", "step 3",
-        "first,", "next,", "then,", "finally,", "to do this",
-        "you'll need", "you will need", "tools needed", "requirements:",
-        "plan:", "approach:", "strategy:", "let's", "i'll",
-    )
+    _S = ("would you like", "do you want", "should i", "let me know", "shall i",
+          "do you need", "want me to", "i can also", "feel free", "here's what",
+          "here is what", "step 1", "step 2", "step 3", "first,", "next,",
+          "then,", "finally,", "to do this", "you'll need", "you will need",
+          "tools needed", "requirements:", "plan:", "approach:", "strategy:",
+          "let's", "i'll")
     for f in ("caption", "analysis"):
         result[f] = "\n".join(
             ln for ln in result[f].splitlines()
-            if not any(ln.strip().lower().startswith(q) for q in _STRIP)
-        ).strip()
+            if not any(ln.strip().lower().startswith(q) for q in _S)).strip()
     return result
+
+
+def self_test() -> bool:
+    """Verify caption parsing and stripping."""
+    r = _parse_caption_response("[CAPTION]\nGreat shot!\n\n[HASHTAGS]\n#tennis")
+    assert r["caption"] == "Great shot!", f"caption: {r['caption']}"
+    assert "#tennis" in r["hashtags"]
+    r2 = _parse_caption_response("Would you like me to help?\nReal caption here")
+    assert "Would you" not in r2["caption"]
+    return True

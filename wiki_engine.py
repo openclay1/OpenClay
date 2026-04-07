@@ -211,3 +211,13 @@ def log_posted_tweet(text: str, tweet_id: str = "") -> Path:
     _append_log("post", f"Tweet posted -> posts/{slug}.md")
     rebuild_index()
     return p
+
+
+def self_test() -> bool:
+    """Verify wiki helpers."""
+    assert _slug("Hello World!") == "hello-world", "slug failed"
+    assert _now() and _today(), "time helpers failed"
+    assert isinstance(build_query_prompt("test"), str), "query prompt failed"
+    assert isinstance(build_lint_prompt(), str), "lint prompt failed"
+    assert isinstance(build_tweet_prompt("test"), str), "tweet prompt failed"
+    return True

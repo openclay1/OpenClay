@@ -46,13 +46,14 @@ def _read_image_with_vision(image_path: Path) -> str:
         "Do not truncate or abbreviate the values — copy them in full.\n"
     )
     # Try llava models
+    from retry_ext import retry_call
     for model in ["llava-llama3", "llava", "llava:7b"]:
         try:
-            resp = requests.post(
-                "http://localhost:11434/api/generate",
+            resp = retry_call(
+                requests.post, "http://localhost:11434/api/generate",
                 json={"model": model, "prompt": prompt,
                       "images": [b64], "stream": False},
-                timeout=120,
+                timeout=120, label=f"cred-vision-{model}",
             )
             if resp.status_code == 200:
                 return resp.json().get("response", "")
@@ -181,3 +182,14 @@ def store_credentials_from_images(image_paths: list[Path]) -> str:
         except Exception:
             pass
     return " ".join(parts)
+
+
+def self_test() -> bool:
+    """Verify parsing and mapping logic."""
+    assert is_image(Path("test.png")) and not is_image(Path("test.txt"))
+    parsed = _parse_credentials("LABEL: Consumer Key\nVALUE: abc123")
+    assert parsed.get("TWITTER_API_KEY") == "abc123", f"parse failed: {parsed}"
+    assert _detect_platform({"TWITTER_API_KEY": "x"}) == "twitter"
+    assert _detect_platform({"OPENAI_API_KEY": "x"}) == "openai"
+    assert _detect_platform({}) == "unknown"
+    return True

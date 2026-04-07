@@ -131,13 +131,12 @@ def _exchange_ig_code(code: str) -> dict:
     app_id = _env_get("INSTAGRAM_APP_ID")
     app_secret = _env_get("INSTAGRAM_APP_SECRET")
 
+    from retry_ext import retry_call
     # Step 1: Exchange code for short-lived token (GET for Graph API)
-    resp = requests.get(IG_TOKEN_URL, params={
-        "client_id": app_id,
-        "client_secret": app_secret,
-        "redirect_uri": CALLBACK_URL,
-        "code": code,
-    }, timeout=15)
+    resp = retry_call(requests.get, IG_TOKEN_URL, params={
+        "client_id": app_id, "client_secret": app_secret,
+        "redirect_uri": CALLBACK_URL, "code": code,
+    }, timeout=15, label="ig-token-exchange")
 
     if resp.status_code != 200:
         return {"error": f"Token exchange failed: {resp.text[:200]}"}
@@ -147,33 +146,29 @@ def _exchange_ig_code(code: str) -> dict:
 
     # Step 2: Exchange for long-lived token (60 days)
     if short_token and app_secret:
-        ll_resp = requests.get(IG_LONG_LIVED_URL, params={
-            "grant_type": "fb_exchange_token",
-            "client_id": app_id,
-            "client_secret": app_secret,
-            "fb_exchange_token": short_token,
-        }, timeout=15)
+        ll_resp = retry_call(requests.get, IG_LONG_LIVED_URL, params={
+            "grant_type": "fb_exchange_token", "client_id": app_id,
+            "client_secret": app_secret, "fb_exchange_token": short_token,
+        }, timeout=15, label="ig-long-lived-token")
         if ll_resp.status_code == 200:
             ll_data = ll_resp.json()
             short_token = ll_data.get("access_token", short_token)
 
     # Step 3: Get Instagram Business Account ID via pages
     ig_user_id = ""
-    pages_resp = requests.get(
+    pages_resp = retry_call(requests.get,
         "https://graph.facebook.com/v21.0/me/accounts",
         params={"access_token": short_token}, timeout=15,
-    )
+        label="ig-pages")
     if pages_resp.status_code == 200:
         pages = pages_resp.json().get("data", [])
         if pages:
             page_id = pages[0]["id"]
-            ig_resp = requests.get(
+            ig_resp = retry_call(requests.get,
                 f"https://graph.facebook.com/v21.0/{page_id}",
-                params={
-                    "fields": "instagram_business_account",
-                    "access_token": short_token,
-                }, timeout=15,
-            )
+                params={"fields": "instagram_business_account",
+                        "access_token": short_token},
+                timeout=15, label="ig-biz-account")
             if ig_resp.status_code == 200:
                 ig_data = ig_resp.json()
                 ig_biz = ig_data.get("instagram_business_account", {})
@@ -261,3 +256,12 @@ def save_app_credentials(app_id: str, app_secret: str) -> str:
     _write_env("INSTAGRAM_APP_SECRET", app_secret.strip())
     _log_decision("Instagram app credentials saved", f"app_id={app_id[:8]}...")
     return "Saved. Now click 'Connect Instagram' to authorize."
+
+
+def self_test() -> bool:
+    """Verify OAuth helpers."""
+    status = check_instagram_ready()
+    assert isinstance(status, dict) and "app_configured" in status
+    env = _read_env(); assert isinstance(env, dict)
+    assert save_app_credentials("", "") == "Both App ID and App Secret are required."
+    return True

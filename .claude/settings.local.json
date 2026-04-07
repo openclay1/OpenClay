@@ -76,7 +76,18 @@
       "Bash(python3 -c \"import py_compile; py_compile.compile\\(''panel.py'', doraise=True\\); print\\(''OK''\\)\")",
       "Bash(ls \"/Users/no_ta/Desktop/Open Clay/\"*.py)",
       "Bash(/Users/no_ta/Library/Python/3.9/bin/pyproject-build)",
-      "Bash(/Users/no_ta/Library/Python/3.9/bin/twine upload:*)"
+      "Bash(/Users/no_ta/Library/Python/3.9/bin/twine upload:*)",
+      "Bash(pip3 index:*)",
+      "Bash(curl -s https://pypi.org/pypi/openclay/json)",
+      "Bash(python3 -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\(''''Owner:'''', d[''''info''''][''''author'''']\\); print\\(''''Version:'''', d[''''info''''][''''version'''']\\)\")",
+      "Bash(rm -f \"/Users/no_ta/Desktop/Open Clay/healing_log.md\")",
+      "Bash(python3 -m playwright install chromium)",
+      "Bash(rm -f browser_log.md)",
+      "Bash(python3 -c \"from model_router import self_test; print\\(''model_router:'', self_test\\(\\)\\)\")",
+      "Bash(python3 -c \"import socket; s=socket.socket\\(socket.AF_INET,socket.SOCK_DGRAM\\); s.connect\\(\\(''8.8.8.8'',80\\)\\); print\\(''Local IP:'', s.getsockname\\(\\)[0]\\); s.close\\(\\)\")",
+      "Bash(python3 -c \"from mobile_bridge import self_test; print\\(''mobile_bridge:'', self_test\\(\\)\\)\")",
+      "Bash(python3 -c \"from self_build_loop import self_test; print\\(''self_build_loop:'', self_test\\(\\)\\)\")",
+      "Bash(python3 -c \"import sys,json; print\\(''''config version:'''', json.load\\(sys.stdin\\).get\\(''''version'''',''''not set''''\\)\\)\")"
     ]
   }
 }

@@ -26,6 +26,17 @@ content/
 knowledge_base/
 project/
 agent_decisions.md
+security_log.md
+healing_log.md
+pending_approvals/
+proposed_fixes/
+screenshots/
+browser_log.md
+routing_log.md
+bridge_log.md
+self_build_log.md
+backups/
+input/
 progress.txt
 
 # Wiki — user data stays local

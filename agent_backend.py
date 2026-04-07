@@ -1,12 +1,7 @@
-"""agent_backend.py — Switchable agent backend (clawcode / claudecode via Ollama)."""
+"""agent_backend.py — Switchable LLM backend (clawcode / claudecode via Ollama)."""
 from __future__ import annotations
-
-import json
-import os
-import subprocess
+import json, os, subprocess, urllib.request
 from pathlib import Path
-
-import urllib.request
 
 try:
     import requests
@@ -119,33 +114,29 @@ def _exec_tool(name: str, args: dict) -> str:
         if not str(p.resolve()).startswith(str(BASE_DIR)):
             return "Error: path outside project directory"
         p.parent.mkdir(parents=True, exist_ok=True)
-        p.write_text(args["content"])
-        return f"Written {len(args['content'])} chars to {p}"
-    elif name == "read_file":
+        p.write_text(args["content"]); return f"Written {len(args['content'])} chars to {p}"
+    if name == "read_file":
         p = Path(args["path"])
-        if not p.exists():
-            return f"Error: {p} not found"
-        return p.read_text()[:4000]
-    elif name == "run_command":
+        return p.read_text()[:4000] if p.exists() else f"Error: {p} not found"
+    if name == "run_command":
         try:
-            r = subprocess.run(
-                args["command"], shell=True, capture_output=True,
-                text=True, timeout=30, cwd=str(BASE_DIR))
+            r = subprocess.run(args["command"], shell=True, capture_output=True,
+                               text=True, timeout=30, cwd=str(BASE_DIR))
             return (r.stdout + r.stderr)[:4000]
-        except subprocess.TimeoutExpired:
-            return "Error: command timed out (30s)"
-    elif name == "list_files":
+        except subprocess.TimeoutExpired: return "Error: command timed out (30s)"
+    if name == "list_files":
         p = Path(args.get("path", str(BASE_DIR)))
-        if p.is_dir():
-            return "\n".join(f.name for f in sorted(p.iterdir())[:50])
-        return f"Error: {p} is not a directory"
+        return "\n".join(f.name for f in sorted(p.iterdir())[:50]) if p.is_dir() else f"Error: {p} is not a directory"
     return f"Error: unknown tool {name}"
 
 
 # ── Shared: urllib fallback for when requests is unavailable ──
 
+def _check_domain(url: str) -> bool: return __import__("permissions").check_domain(url)
+
 def _ollama_chat_urllib(prompt: str, model: str) -> str:
     """Simple /api/chat call using only urllib (no tool use)."""
+    from retry_ext import retry_call
     payload = json.dumps({
         "model": model,
         "messages": [{"role": "user", "content": prompt}],
@@ -155,7 +146,8 @@ def _ollama_chat_urllib(prompt: str, model: str) -> str:
         req = urllib.request.Request(
             f"{OLLAMA_URL}/api/chat", data=payload,
             headers={"Content-Type": "application/json"})
-        resp = urllib.request.urlopen(req, timeout=120)
+        resp = retry_call(urllib.request.urlopen, req, timeout=120,
+                          label="ollama-chat-urllib")
         data = json.loads(resp.read())
         return data.get("message", {}).get("content", "")
     except Exception:
@@ -164,18 +156,21 @@ def _ollama_chat_urllib(prompt: str, model: str) -> str:
 
 def _ollama_post(url: str, body: dict, timeout: int = 120) -> dict | None:
     """POST to Ollama using requests or urllib."""
+    if not _check_domain(url): return None
+    from retry_ext import retry_call
     if requests:
         try:
-            r = requests.post(url, json=body, timeout=timeout)
+            r = retry_call(requests.post, url, json=body, timeout=timeout,
+                           label="ollama-post")
             return r.json() if r.status_code == 200 else None
         except Exception:
             return None
-    # urllib fallback
     payload = json.dumps(body).encode()
     try:
         req = urllib.request.Request(
             url, data=payload, headers={"Content-Type": "application/json"})
-        resp = urllib.request.urlopen(req, timeout=timeout)
+        resp = retry_call(urllib.request.urlopen, req, timeout=timeout,
+                          label="ollama-post-urllib")
         return json.loads(resp.read())
     except Exception:
         return None
@@ -231,31 +226,26 @@ def _find_ollama() -> str:
 
 def _claudecode_generate(prompt: str, model: str) -> str:
     """Original simple path: ollama run via subprocess."""
+    from retry_ext import retry_call
     ollama = _find_ollama()
     try:
-        result = subprocess.run(
-            [ollama, "run", model, prompt],
-            capture_output=True, text=True, timeout=120,
-        )
+        result = retry_call(subprocess.run, [ollama, "run", model, prompt],
+                            capture_output=True, text=True, timeout=120,
+                            label="ollama-cli")
         if result.returncode == 0:
             return result.stdout.strip()
     except Exception:
         pass
-    # Fallback: use urllib if subprocess fails
     return _ollama_chat_urllib(prompt, model)
 
 
 # ── Public API ──
 
 def _inject_memory(prompt: str) -> str:
-    """Prepend AGENTS.md context to the prompt if available."""
     try:
-        from memory import load_memory_context
-        ctx = load_memory_context()
-        if ctx:
-            return f"AGENT MEMORY:\n{ctx}\n\n---\n\n{prompt}"
-    except Exception:
-        pass
+        ctx = __import__("memory").load_memory_context()
+        if ctx: return f"AGENT MEMORY:\n{ctx}\n\n---\n\n{prompt}"
+    except Exception: pass
     return prompt
 
 
@@ -268,6 +258,8 @@ def generate(prompt: str, model: str | None = None) -> str:
     if model is None:
         model = get_model()
     backend = get_backend()
+    from input_guard import guard
+    prompt, _flags = guard(prompt)
     full_prompt = _inject_memory(prompt)
     try:
         if backend == "clawcode":
@@ -292,9 +284,17 @@ def generate(prompt: str, model: str | None = None) -> str:
         raise
 
 
-def generate_with_tools(prompt: str, model: str | None = None,
-                        max_turns: int = 5) -> str:
+def generate_with_tools(prompt: str, model: str | None = None, max_turns: int = 5) -> str:
     """Force the tool-use agent loop regardless of backend setting."""
-    if model is None:
-        model = get_model()
+    if model is None: model = get_model()
+    from input_guard import guard
+    prompt, _ = guard(prompt)
     return _clawcode_generate(prompt, model, max_turns=max_turns)
+
+def self_test() -> bool:
+    """Verify backend config and domain gate."""
+    assert get_backend() in ("clawcode", "claudecode"), "bad backend"
+    assert isinstance(get_model(), str), "model not str"
+    assert _check_domain("http://localhost:11434"), "localhost blocked"
+    assert not _check_domain("https://evil.com"), "evil allowed"
+    return True

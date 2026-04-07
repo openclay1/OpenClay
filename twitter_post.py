@@ -45,16 +45,25 @@ def post_tweet(text: str) -> dict:
         return {"error": "Twitter credentials missing from .env"}
 
     try:
+        from retry_ext import retry_call
         client = tweepy.Client(
             consumer_key=api_key,
             consumer_secret=api_secret,
             access_token=access_token,
             access_token_secret=access_secret,
         )
-        response = client.create_tweet(text=text[:280])
+        response = retry_call(client.create_tweet, text=text[:280],
+                              label="twitter-post")
         tweet_id = response.data.get("id", "")
         return {"success": True, "tweet_id": str(tweet_id)}
     except tweepy.TweepyException as e:
         return {"error": f"Twitter API error: {e}"}
     except Exception as e:
         return {"error": f"Failed to post: {e}"}
+
+
+def self_test() -> bool:
+    """Verify config reading and readiness check."""
+    assert isinstance(check_twitter_ready(), bool), "check not bool"
+    assert isinstance(_read_env_key("NONEXISTENT_KEY_XYZ"), str), "env read failed"
+    return True

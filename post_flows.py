@@ -169,3 +169,13 @@ def handle_confirm_tweet(tweet_text):
 
 def copy_text(caption, hashtags):
     return f"{caption}\n\n{hashtags}" if hashtags.strip() else caption
+
+
+def self_test() -> bool:
+    """Verify tweet cleaning."""
+    assert clean_tweet('"Hello world"') == "Hello world"
+    assert clean_tweet("Here's your tweet: test") == "your tweet: test"
+    assert clean_tweet("Would you like me to post?") == ""
+    assert len(clean_tweet("x" * 300)) <= 280, "over 280"
+    assert clean_tweet("Tweet: Real content here") == "Real content here"
+    return True

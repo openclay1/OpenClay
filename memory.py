@@ -206,3 +206,11 @@ def update_progress(objective: str, steps: int = 0,
 def clear_progress() -> None:
     """Reset progress.txt to idle."""
     update_progress("none", 0, "idle")
+
+
+def self_test() -> bool:
+    """Verify memory read/write cycle."""
+    s = load_memory(); assert isinstance(s, dict), "load_memory not dict"
+    ctx = load_memory_context(); assert isinstance(ctx, str), "context not str"
+    p = load_progress(); assert isinstance(p, dict), "progress not dict"
+    _parse_sections("## Test\ndata"); return True

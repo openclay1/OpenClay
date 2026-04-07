@@ -1,13 +1,9 @@
 """panel.py — OpenClay dashboard."""
 import re, time
 from pathlib import Path
-try:
-    import gradio as gr
-except ImportError:
-    gr = None
-
+try: import gradio as gr
+except ImportError: gr = None
 BASE_DIR = Path(__file__).parent
-
 def _show(val=True): return gr.update(visible=val)
 def _hide(): return gr.update(visible=False)
 def _verb(t): return f'<span class="status-verb">{t}</span>'
@@ -32,10 +28,18 @@ _P = {  # pattern groups
     "wiki_lint": [r"^lint(?:\s+wiki)?\s*$", r"^check\s+wiki\b", r"\bwiki\s+health\b"],
     "creds": [r"^store\s+(?:these\s+)?(?:credentials?|keys?)\b",
               r"^(?:save|keep|take\s+care\s+of)\s+(?:these\s+)?(?:keys?|credentials?)\b"],
+    "approve": [r"^approve\s+(\S+)"],
+    "deny": [r"^deny\s+(\S+)"],
 }
 
 def _detect_intent(text: str) -> tuple:
     low = text.lower().strip()
+    for pat in _P["approve"]:
+        m = re.search(pat, low)
+        if m: return "approve", m.group(1).strip()
+    for pat in _P["deny"]:
+        m = re.search(pat, low)
+        if m: return "deny", m.group(1).strip()
     for pat in _P["creds"]:
         if re.search(pat, low): return "credentials", ""
     for pat in _P["wiki_init"]:
@@ -63,18 +67,12 @@ def _detect_intent(text: str) -> tuple:
 
 
 def _receive_files(files):
-    """Copy dropped files to raw/ or detect credential screenshots."""
     import shutil
-    from credential_store import is_image
     if not files: return gr.update()
-    flist = files if isinstance(files, list) else [files]
-    paths = [Path(str(f)) for f in flist]
-    # If ALL files are images, could be credentials — let user confirm
-    if all(is_image(p) for p in paths):
+    paths = [Path(str(f)) for f in (files if isinstance(files, list) else [files])]
+    if all(__import__("credential_store").is_image(p) for p in paths):
         return gr.update(value="store credentials")
-    # Otherwise, copy to raw/ for wiki ingest
-    raw_dir = BASE_DIR / "raw" / "articles"
-    raw_dir.mkdir(parents=True, exist_ok=True)
+    raw_dir = BASE_DIR / "raw" / "articles"; raw_dir.mkdir(parents=True, exist_ok=True)
     names = []
     for src in paths:
         try: shutil.copy2(str(src), str(raw_dir / src.name)); names.append(src.name)
@@ -112,39 +110,33 @@ def _run_and_fill(intention, files, prev_ctx):
     intention = intention.strip()
     kind, content = _detect_intent(intention)
 
+    if kind in ("approve", "deny"):
+        fn = getattr(__import__("permissions"), kind)
+        ok = fn(content); w = kind.capitalize() + ("d" if kind == "deny" else "d")
+        msg = f"**{w}** `{content}`." if ok else f"**Not found:** `{content}`"
+        yield msg, _show(), msg, _hide(), None; return
+
     if kind == "credentials":
         yield _verb("Reading credentials..."), _hide(), "", _hide(), None
         from credential_store import store_credentials_from_images
         imgs = [Path(str(f)) for f in (files if isinstance(files, list) else [files])] if files else []
-        if not imgs:
-            yield "Drop credential screenshots first, then hit Go.", _hide(), "", _hide(), None
-            return
-        msg = store_credentials_from_images(imgs)
-        yield msg, _show(), msg, _hide(), None
-        return
+        if not imgs: yield "Drop credential screenshots first, then hit Go.", _hide(), "", _hide(), None; return
+        yield store_credentials_from_images(imgs), _show(), "", _hide(), None; return
 
     if kind == "wiki_init":
         yield _verb("Building wiki..."), _hide(), "", _hide(), None
-        msg = __import__("wiki_engine").wiki_init()
-        yield msg, _show(), msg, _hide(), None
-        return
+        msg = __import__("wiki_engine").wiki_init(); yield msg, _show(), msg, _hide(), None; return
 
     if kind == "wiki_ingest":
         yield _verb("Looking for file..."), _hide(), "", _hide(), None
         from wiki_engine import find_raw_file, build_ingest_prompt, save_ingest_result
         fpath = find_raw_file(content)
-        if not fpath:
-            yield f"**Error:** No file matching '{content}' in raw/.", _hide(), "", _hide(), None
-            return
+        if not fpath: yield f"**Error:** No file matching '{content}' in raw/.", _hide(), "", _hide(), None; return
         yield _verb(f"Reading {fpath.name}..."), _hide(), "", _hide(), None
-        try:
-            result = __import__("agent_backend").generate(build_ingest_prompt(fpath))
-        except Exception as e:
-            yield f"**Error:** {e}", _hide(), "", _hide(), None; return
+        try: result = __import__("agent_backend").generate(build_ingest_prompt(fpath))
+        except Exception as e: yield f"**Error:** {e}", _hide(), "", _hide(), None; return
         yield _verb("Filing into wiki..."), _hide(), "", _hide(), None
-        created = save_ingest_result(fpath, result)
-        yield "**Ingested:** " + ", ".join(created), _show(), result, _hide(), None
-        return
+        yield "**Ingested:** " + ", ".join(save_ingest_result(fpath, result)), _show(), result, _hide(), None; return
 
     if kind == "wiki_query":
         yield _verb("Searching wiki..."), _hide(), "", _hide(), None
@@ -168,11 +160,9 @@ def _run_and_fill(intention, files, prev_ctx):
 
     if kind == "direct_post":
         tweet = _clean_tweet(content)
-        if not tweet:
-            yield "**Error:** No tweet text found.", _hide(), "", _hide(), None; return
+        if not tweet: yield "**Error:** No tweet text found.", _hide(), "", _hide(), None; return
         yield _verb("Posting directly..."), _show(), tweet, _hide(), None
-        yield _post_tweet_text(tweet), _show(), tweet, _hide(), None
-        return
+        yield _post_tweet_text(tweet), _show(), tweet, _hide(), None; return
 
     if kind == "tweet":
         yield _verb("Drafting tweet..."), _hide(), "", _hide(), None
@@ -223,10 +213,8 @@ def build_panel() -> "gr.Blocks":
         raise ImportError("gradio not installed — run: pip3 install gradio")
 
     def _post_draft_clicked(draft_text, _ctx):
-        print("Post clicked")
         yield _verb("Posting..."), _show(), draft_text, _show(), _ctx
-        msg = _post_tweet_text(draft_text)
-        yield msg, _show(), draft_text, _hide(), None
+        yield _post_tweet_text(draft_text), _show(), draft_text, _hide(), None
 
     with gr.Blocks(title="OpenClay") as panel:
         gr.Markdown("# *OpenClay*", elem_classes=["app-title"])
@@ -242,28 +230,45 @@ def build_panel() -> "gr.Blocks":
             label="Drop files here — documents, credentials, anything",
             file_count="multiple", elem_classes=["drop-zone"],
         )
-        run_btn = gr.Button("Go", variant="primary",
-                            elem_classes=["run-btn"])
+        run_btn = gr.Button("Go", variant="primary", elem_classes=["run-btn"])
         run_status = gr.Markdown("", elem_classes=["status-bar"])
-
         ctx_state = gr.State(None)
-
         # ══ RESULT AREA ══
-        with gr.Group(visible=False,
-                      elem_classes=["result-card"]) as run_result_grp:
+        with gr.Group(visible=False, elem_classes=["result-card"]) as run_result_grp:
             gr.Markdown("### Result", elem_classes=["result-heading"])
-            agent_result = gr.Textbox(
-                label="", lines=6, interactive=True,
-                elem_classes=["result-text"],
-            )
-            draft_post_btn = gr.Button(
-                "Post", variant="primary", visible=False,
-                elem_classes=["run-btn"],
-            )
+            agent_result = gr.Textbox(label="", lines=6, interactive=True, elem_classes=["result-text"])
+            draft_post_btn = gr.Button("Post", variant="primary", visible=False, elem_classes=["run-btn"])
 
-        # ── Wire: file drop → copy to raw/ and pre-fill input ──
-        drop_zone.change(_receive_files, inputs=[drop_zone],
-                         outputs=[main_input])
+        # ══ MOBILE ══
+        with gr.Accordion("Mobile", open=False, elem_classes=["result-card"]):
+            try: gr.HTML(__import__("mobile_bridge").add_mobile_section())
+            except Exception: gr.Markdown("_Mobile bridge not available._")
+
+        # ══ SELF-BUILD ══
+        improve_status = gr.Markdown("", elem_classes=["status-bar"])
+        def _run_improve():
+            try:
+                r = __import__("self_build_loop").run_once()
+                return f"**Self-build:** {r.get('status')} — {r.get('explanation', r.get('failures', 'done'))}"
+            except Exception as e: return f"**Error:** {e}"
+        improve_btn = gr.Button("Improve OpenClay", variant="secondary", elem_classes=["run-btn"])
+        improve_btn.click(_run_improve, inputs=[], outputs=[improve_status])
+
+        # ══ PENDING APPROVALS + WATCHDOG ALERT ══
+        approvals_md = gr.Markdown("", visible=False, elem_classes=["approvals-bar"])
+        needs_attn = gr.Markdown("", visible=False, elem_classes=["watchdog-alert"])
+        def _poll_approvals():
+            p = __import__("permissions").list_pending()
+            if not p: return gr.update(value="", visible=False)
+            lines = [f"- `{x['action']}` — {x['detail'][:60]} — id: `{x['id']}`" for x in p[:5]]
+            return gr.update(value="**Pending:**\n" + "\n".join(lines) + "\n_approve/deny <id>_", visible=True)
+        def _poll_alert():
+            p = BASE_DIR / "data" / "watchdog_alert.txt"
+            t = p.read_text().strip() if p.exists() else ""
+            return gr.update(value=f"**Needs from you:** {t}", visible=True) if t else gr.update(value="", visible=False)
+        panel.load(_poll_approvals, inputs=[], outputs=[approvals_md], every=15)
+        panel.load(_poll_alert, inputs=[], outputs=[needs_attn], every=30)
+        drop_zone.change(_receive_files, inputs=[drop_zone], outputs=[main_input])
 
         _out = [run_status, run_result_grp, agent_result, draft_post_btn, ctx_state]
         run_btn.click(_run_and_fill, inputs=[main_input, drop_zone, ctx_state],
@@ -276,12 +281,19 @@ def build_panel() -> "gr.Blocks":
     return panel
 
 
-def launch(share: bool = False):
-    panel = build_panel()
-    panel.launch(server_name="127.0.0.1", server_port=7861, share=share,
-                 inbrowser=True, show_error=True, css=_load_css(),
-                 quiet=True)
+def launch(share=False):
+    p = build_panel()
+    p.launch(server_name="127.0.0.1", server_port=7861, share=share,
+             inbrowser=True, show_error=True, css=_load_css(), quiet=True)
 
+def self_test() -> bool:
+    """Verify intent detection."""
+    assert _detect_intent("build wiki")[0] == "wiki_init"
+    assert _detect_intent("post a tweet about AI")[0] == "tweet"
+    assert _detect_intent("ingest report.md")[0] == "wiki_ingest"
+    assert _detect_intent("approve abc123")[0] == "approve"
+    assert _detect_intent("deny xyz")[0] == "deny"
+    assert _detect_intent("hello world")[0] == "general"
+    return True
 
-if __name__ == "__main__":
-    launch()
+if __name__ == "__main__": launch()

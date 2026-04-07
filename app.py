@@ -87,6 +87,27 @@ def main():
     except Exception:
         pass
 
+    # Start watchdog daemon
+    try:
+        from watchdog import run as watchdog_run
+        threading.Thread(target=watchdog_run, daemon=True, name="oc-watchdog").start()
+    except Exception:
+        pass
+
+    # Start self-improver (24h cycle)
+    try:
+        from self_improver import run_loop as improver_loop
+        threading.Thread(target=improver_loop, daemon=True, name="oc-improver").start()
+    except Exception:
+        pass
+
+    # Start mobile bridge (WebSocket + static + wake-word)
+    try:
+        from mobile_bridge import start as mobile_start
+        mobile_start()
+    except Exception:
+        pass
+
     # One clean line, then open the browser
     print("\n  ✓ OpenClay ready → http://127.0.0.1:7861\n")
 

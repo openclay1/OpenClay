@@ -1,5 +1,5 @@
 {
-  "version": "0.1.0",
+  "version": "1.0.0",
   "name": "OpenClay",
   "model": "auto",
   "panel_port": 7861,
@@ -17,5 +17,20 @@
     "logs": "logs",
     "profiles": "profiles",
     "demo_assets": "demo_assets"
-  }
+  },
+  "allowed_domains": [
+    "localhost",
+    "127.0.0.1",
+    "api.twitter.com",
+    "upload.twitter.com",
+    "graph.facebook.com",
+    "api.instagram.com",
+    "api.anthropic.com",
+    "api.openai.com",
+    "ollama.com",
+    "fonts.googleapis.com",
+    "api.fontshare.com",
+    "pypi.org",
+    "upload.pypi.org"
+  ]
 }

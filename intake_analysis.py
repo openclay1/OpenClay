@@ -74,10 +74,12 @@ INTAKE_MODEL = "qwen2.5:0.5b"
 
 def ollama_generate(prompt: str, model: str = INTAKE_MODEL) -> str:
     """Generate text using Ollama. Falls back to empty string if unavailable."""
+    from retry_ext import retry_call
     try:
-        result = subprocess.run(
-            ["ollama", "run", model, prompt],
+        result = retry_call(
+            subprocess.run, ["ollama", "run", model, prompt],
             capture_output=True, text=True, timeout=60,
+            label="intake-ollama",
         )
         if result.returncode == 0 and result.stdout.strip():
             return result.stdout.strip()
@@ -198,3 +200,14 @@ The question should help reveal their real blocker. Just the question, nothing e
     if any(w in text_lower for w in ["team", "people", "nobody", "alone"]):
         return "If you could clone yourself, which version would you send to fix this?"
     return "Walk me through what happens right before it breaks — not the error, but what you were trying to do."
+
+
+def self_test() -> bool:
+    """Verify archetype detection and domain inference."""
+    assert detect_archetype("I need to set up a server") == "clear"
+    assert detect_archetype("I'm stuck and frustrated") == "stuck"
+    assert detect_archetype("I want to explore") == "blank"
+    assert infer_domain("deploy my api server") == "development"
+    assert infer_domain("write a blog post") == "content"
+    assert classify_content_intent("ready to post my video") == "post_ready"
+    return True

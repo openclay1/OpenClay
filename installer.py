@@ -34,14 +34,12 @@ def _log_decision(action: str, detail: str, confidence: float = 1.0):
 
 
 def _run_silent(cmd: str, timeout: int = 300) -> tuple[bool, str]:
-    """Run a shell command silently. Returns (success, output)."""
+    """Run a shell command silently with retry. Returns (success, output)."""
+    from retry_ext import retry_call
     try:
-        result = subprocess.run(
-            cmd,
-            shell=True,
-            capture_output=True,
-            text=True,
-            timeout=timeout,
+        result = retry_call(
+            subprocess.run, cmd, shell=True, capture_output=True,
+            text=True, timeout=timeout, label=f"installer-cmd",
         )
         return result.returncode == 0, result.stdout + result.stderr
     except subprocess.TimeoutExpired:
@@ -280,19 +278,21 @@ def run() -> dict:
     with open(QUEUE_DIR / "installer_complete.json", "w") as f:
         json.dump(queue_item, f, indent=2)
 
-    installed_count = sum(
-        1 for t in results["tools"]
-        if t["status"] in ("installed", "already_installed")
-    )
-    _log_decision(
-        "installation complete",
-        f"ollama={results['ollama']['status']}, model={model_name}, "
-        f"tools={installed_count}/{len(results['tools'])}",
-    )
+    installed_count = sum(1 for t in results["tools"]
+                          if t["status"] in ("installed", "already_installed"))
+    _log_decision("installation complete",
+                  f"ollama={results['ollama']['status']}, model={model_name}, "
+                  f"tools={installed_count}/{len(results['tools'])}")
 
     return results
 
 
+def self_test() -> bool:
+    """Verify installer helpers."""
+    ok, out = _run_silent("echo hello", timeout=5)
+    assert ok and "hello" in out, "run_silent failed"
+    assert isinstance(collect_credentials([]), dict), "creds not dict"
+    return True
+
 if __name__ == "__main__":
-    results = run()
-    print(json.dumps(results, indent=2))
+    print(json.dumps(run(), indent=2))

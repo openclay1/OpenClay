@@ -1,0 +1,72 @@
+[
+  {
+    "id": "import-failure",
+    "pattern": "ModuleNotFoundError|ImportError",
+    "fix_command": "pip3 install -r requirements.txt",
+    "success_check": "python3 -c \"import gradio, requests, tweepy\" 2>&1",
+    "description": "Missing Python dependency"
+  },
+  {
+    "id": "port-conflict",
+    "pattern": "Address already in use|port 7861|OSError.*bind",
+    "fix_command": "lsof -ti:7861 | xargs kill -9 2>/dev/null; sleep 1",
+    "success_check": "! lsof -ti:7861 >/dev/null 2>&1",
+    "description": "Gradio port 7861 already in use"
+  },
+  {
+    "id": "ollama-timeout",
+    "pattern": "ollama.*timeout|urlopen.*timed out|ConnectionError.*11434",
+    "fix_command": "ollama serve &",
+    "success_check": "curl -sf http://localhost:11434/api/tags >/dev/null 2>&1",
+    "description": "Ollama server not responding"
+  },
+  {
+    "id": "sqlite-locked",
+    "pattern": "database is locked|OperationalError.*locked",
+    "fix_command": "sleep 2",
+    "success_check": "python3 -c \"import sqlite3; sqlite3.connect('data/openclay.db').execute('SELECT 1').close()\" 2>&1",
+    "description": "SQLite database locked by another process"
+  },
+  {
+    "id": "file-permission",
+    "pattern": "PermissionError|Permission denied",
+    "fix_command": "chmod -R u+rw data/ logs/ queue/ wiki/ raw/ 2>/dev/null; true",
+    "success_check": "test -w data/ && test -w logs/",
+    "description": "File permission denied on project directories"
+  },
+  {
+    "id": "missing-api-key",
+    "pattern": "API key|credentials missing|401 Unauthorized|TWITTER_.*not set",
+    "fix_command": "echo 'No auto-fix — credentials required from user'",
+    "success_check": "false",
+    "description": "API key missing or invalid — needs user input"
+  },
+  {
+    "id": "json-parse",
+    "pattern": "JSONDecodeError|json.decoder|Expecting value",
+    "fix_command": "echo 'Corrupt JSON detected — will retry on next cycle'",
+    "success_check": "true",
+    "description": "Malformed JSON in queue or config file"
+  },
+  {
+    "id": "websocket-disconnect",
+    "pattern": "WebSocket|ConnectionClosedError|websocket.*disconnect|ConnectionResetError",
+    "fix_command": "echo 'WebSocket reset — Gradio will auto-reconnect'",
+    "success_check": "curl -sf http://127.0.0.1:7861/ >/dev/null 2>&1",
+    "description": "Gradio WebSocket connection lost"
+  },
+  {
+    "id": "disk-space",
+    "pattern": "No space left|ENOSPC|disk full|OSError.*28",
+    "fix_command": "find /tmp -name 'gradio*' -mtime +1 -delete 2>/dev/null; true",
+    "success_check": "python3 -c \"import shutil; u=shutil.disk_usage('.'); exit(0 if u.free>100_000_000 else 1)\"",
+    "description": "Disk space critically low"
+  },
+  {
+    "id": "model-not-found",
+    "pattern": "model.*not found|pull.*model|no model|404.*model",
+    "fix_command": "ollama pull qwen2.5:3b-instruct-q4_K_M",
+    "success_check": "ollama list | grep -q qwen2.5",
+    "description": "Ollama model not available locally"
+  }
+]

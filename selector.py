@@ -100,6 +100,13 @@ TOOL_REGISTRY = {
         "ram_min_mb": 64,
         "description": "JSON processor",
     },
+    "browser": {
+        "name": "playwright",
+        "pip": "playwright",
+        "profiles": ["creator", "researcher", "operator", "builder"],
+        "ram_min_mb": 1000,
+        "description": "Headless browser for reading pages, screenshots, wiki ingest",
+    },
 }
 
 
