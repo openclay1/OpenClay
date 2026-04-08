@@ -26,8 +26,6 @@ _P = {  # pattern groups
                    r"\bwhat\s+does\s+(?:my\s+)?wiki\s+(?:say|know)\s+about\s+(.+)",
                    r"\bsearch\s+(?:my\s+)?wiki\s+(?:for\s+)?(.+)"],
     "wiki_lint": [r"^lint(?:\s+wiki)?\s*$", r"^check\s+wiki\b", r"\bwiki\s+health\b"],
-    "creds": [r"^store\s+(?:these\s+)?(?:credentials?|keys?)\b",
-              r"^(?:save|keep|take\s+care\s+of)\s+(?:these\s+)?(?:keys?|credentials?)\b"],
     "approve": [r"^approve\s+(\S+)"],
     "deny": [r"^deny\s+(\S+)"],
 }
@@ -40,8 +38,6 @@ def _detect_intent(text: str) -> tuple:
     for pat in _P["deny"]:
         m = re.search(pat, low)
         if m: return "deny", m.group(1).strip()
-    for pat in _P["creds"]:
-        if re.search(pat, low): return "credentials", ""
     for pat in _P["wiki_init"]:
         if re.search(pat, low): return "wiki_init", ""
     for pat in _P["wiki_ingest"]:
@@ -70,8 +66,6 @@ def _receive_files(files):
     import shutil
     if not files: return gr.update()
     paths = [Path(str(f)) for f in (files if isinstance(files, list) else [files])]
-    if all(__import__("credential_store").is_image(p) for p in paths):
-        return gr.update(value="store credentials")
     raw_dir = BASE_DIR / "raw" / "articles"; raw_dir.mkdir(parents=True, exist_ok=True)
     names = []
     for src in paths:
@@ -81,23 +75,6 @@ def _receive_files(files):
 
 
 def _clean_tweet(raw): return __import__("post_flows").clean_tweet(raw)
-
-
-def _post_tweet_text(text: str) -> str:
-    from twitter_post import check_twitter_ready, post_tweet
-    if not check_twitter_ready(): return "**Error:** Twitter credentials not set."
-    result = post_tweet(text.strip())
-    if result.get("success"):
-        tid = result.get("tweet_id", "")
-        try: __import__("wiki_engine").log_posted_tweet(text.strip(), tweet_id=tid)
-        except Exception: pass
-        try: __import__("memory").record_success("tweet_post", "tweepy", f"id:{tid}")
-        except Exception: pass
-        return f"**Posted.** Tweet ID: {tid}"
-    err = result.get("error", "Unknown error")
-    try: __import__("memory").record_failure("tweet_post", err)
-    except Exception: pass
-    return f"**Error:** {err}"
 
 
 # ─── Main handler: Go button at top ───
@@ -115,13 +92,6 @@ def _run_and_fill(intention, files, prev_ctx):
         ok = fn(content); w = kind.capitalize() + ("d" if kind == "deny" else "d")
         msg = f"**{w}** `{content}`." if ok else f"**Not found:** `{content}`"
         yield msg, _show(), msg, _hide(), None; return
-
-    if kind == "credentials":
-        yield _verb("Reading credentials..."), _hide(), "", _hide(), None
-        from credential_store import store_credentials_from_images
-        imgs = [Path(str(f)) for f in (files if isinstance(files, list) else [files])] if files else []
-        if not imgs: yield "Drop credential screenshots first, then hit Go.", _hide(), "", _hide(), None; return
-        yield store_credentials_from_images(imgs), _show(), "", _hide(), None; return
 
     if kind == "wiki_init":
         yield _verb("Building wiki..."), _hide(), "", _hide(), None
@@ -162,7 +132,7 @@ def _run_and_fill(intention, files, prev_ctx):
         tweet = _clean_tweet(content)
         if not tweet: yield "**Error:** No tweet text found.", _hide(), "", _hide(), None; return
         yield _verb("Posting directly..."), _show(), tweet, _hide(), None
-        yield _post_tweet_text(tweet), _show(), tweet, _hide(), None; return
+        yield __import__("twitter_post").post_and_log(tweet), _show(), tweet, _hide(), None; return
 
     if kind == "tweet":
         yield _verb("Drafting tweet..."), _hide(), "", _hide(), None
@@ -214,7 +184,7 @@ def build_panel() -> "gr.Blocks":
 
     def _post_draft_clicked(draft_text, _ctx):
         yield _verb("Posting..."), _show(), draft_text, _show(), _ctx
-        yield _post_tweet_text(draft_text), _show(), draft_text, _hide(), None
+        yield __import__("twitter_post").post_and_log(draft_text), _show(), draft_text, _hide(), None
 
     with gr.Blocks(title="OpenClay") as panel:
         gr.Markdown("# *OpenClay*", elem_classes=["app-title"])
@@ -227,17 +197,50 @@ def build_panel() -> "gr.Blocks":
             autofocus=True,
         )
         drop_zone = gr.File(
-            label="Drop files here — documents, credentials, anything",
+            label="Drop files here — documents, anything",
             file_count="multiple", elem_classes=["drop-zone"],
         )
         run_btn = gr.Button("Go", variant="primary", elem_classes=["run-btn"])
         run_status = gr.Markdown("", elem_classes=["status-bar"])
         ctx_state = gr.State(None)
+
         # ══ RESULT AREA ══
         with gr.Group(visible=False, elem_classes=["result-card"]) as run_result_grp:
             gr.Markdown("### Result", elem_classes=["result-heading"])
             agent_result = gr.Textbox(label="", lines=6, interactive=True, elem_classes=["result-text"])
             draft_post_btn = gr.Button("Post", variant="primary", visible=False, elem_classes=["run-btn"])
+
+        # ══ TWITTER ══ # Working app: 2040419672282087424anomalia939 — OPC 2 is NOT verified
+        with gr.Accordion("Twitter", open=False, elem_classes=["result-card"]):
+            tw_k = gr.Textbox(label="API Key", type="password")
+            tw_s = gr.Textbox(label="API Secret", type="password")
+            tw_t = gr.Textbox(label="Access Token", type="password")
+            tw_ts = gr.Textbox(label="Access Token Secret", type="password")
+            tw_save = gr.Button("Save & Test Twitter", variant="primary", elem_classes=["run-btn"])
+            tw_status = gr.Markdown("", elem_classes=["status-bar"])
+            def _save_tw(k, s, t, ts):
+                if not all([k.strip(), s.strip(), t.strip(), ts.strip()]): return "❌ All four fields required"
+                __import__("twitter_post").write_credentials(k.strip(), s.strip(), t.strip(), ts.strip())
+                v = __import__("twitter_post").validate_twitter_credentials()
+                return f"✅ Twitter ready — @{v['username']}" if v["status"] == "ready" else f"❌ {v['detail']}"
+            tw_save.click(_save_tw, inputs=[tw_k, tw_s, tw_t, tw_ts], outputs=[tw_status])
+
+        # ══ STORAGE ══
+        with gr.Accordion("Storage", open=False, elem_classes=["result-card"]):
+            st_md = gr.Markdown(""); clean_btn = gr.Button("Clean Now", variant="secondary", elem_classes=["run-btn"])
+            def _disk():
+                return "**Disk:** " + __import__("subprocess").run(
+                    ["du", "-sh", str(BASE_DIR)], capture_output=True, text=True).stdout.split()[0]
+            def _clean():
+                import time as _t; now = _t.time(); out = []
+                for f in list(BASE_DIR.glob("*_log*")) + list(BASE_DIR.glob("*decisions*")):
+                    days = 30 if "security" in f.name else 7
+                    if f.is_file() and (now - f.stat().st_mtime) > days * 86400: out.append(f.name); f.unlink()
+                bk = BASE_DIR / "backups"
+                for f in (list(bk.iterdir()) if bk.exists() else []):
+                    if f.is_file() and (now - f.stat().st_mtime) > 7 * 86400: out.append(f"backups/{f.name}"); f.unlink()
+                return f"**Cleaned:** {', '.join(out)}\n{_disk()}" if out else f"Nothing to clean. {_disk()}"
+            clean_btn.click(_clean, inputs=[], outputs=[st_md])
 
         # ══ MOBILE ══
         with gr.Accordion("Mobile", open=False, elem_classes=["result-card"]):
@@ -266,17 +269,14 @@ def build_panel() -> "gr.Blocks":
             p = BASE_DIR / "data" / "watchdog_alert.txt"
             t = p.read_text().strip() if p.exists() else ""
             return gr.update(value=f"**Needs from you:** {t}", visible=True) if t else gr.update(value="", visible=False)
-        panel.load(_poll_approvals, inputs=[], outputs=[approvals_md], every=15)
-        panel.load(_poll_alert, inputs=[], outputs=[needs_attn], every=30)
+        gr.Timer(15).tick(_poll_approvals, inputs=[], outputs=[approvals_md])
+        gr.Timer(30).tick(_poll_alert, inputs=[], outputs=[needs_attn])
         drop_zone.change(_receive_files, inputs=[drop_zone], outputs=[main_input])
 
         _out = [run_status, run_result_grp, agent_result, draft_post_btn, ctx_state]
-        run_btn.click(_run_and_fill, inputs=[main_input, drop_zone, ctx_state],
-                      outputs=_out)
-        main_input.submit(_run_and_fill, inputs=[main_input, drop_zone, ctx_state],
-                          outputs=_out)
-        draft_post_btn.click(_post_draft_clicked, inputs=[agent_result, ctx_state],
-                             outputs=_out)
+        run_btn.click(_run_and_fill, inputs=[main_input, drop_zone, ctx_state], outputs=_out)
+        main_input.submit(_run_and_fill, inputs=[main_input, drop_zone, ctx_state], outputs=_out)
+        draft_post_btn.click(_post_draft_clicked, inputs=[agent_result, ctx_state], outputs=_out)
 
     return panel
 

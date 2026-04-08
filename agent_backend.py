@@ -14,65 +14,17 @@ ENV_PATH = BASE_DIR / ".env"
 OLLAMA_URL = "http://localhost:11434"
 
 # ── Tools available to the Claw Code agent loop ──
-AGENT_TOOLS = [
-    {
-        "type": "function",
-        "function": {
-            "name": "write_file",
-            "description": "Write content to a file at the given path.",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "path": {"type": "string", "description": "File path"},
-                    "content": {"type": "string", "description": "File content"},
-                },
-                "required": ["path", "content"],
-            },
-        },
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "read_file",
-            "description": "Read a file and return its contents.",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "path": {"type": "string", "description": "File path"},
-                },
-                "required": ["path"],
-            },
-        },
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "run_command",
-            "description": "Run a shell command and return stdout.",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "command": {"type": "string", "description": "Shell command"},
-                },
-                "required": ["command"],
-            },
-        },
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "list_files",
-            "description": "List files in a directory.",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "path": {"type": "string", "description": "Directory path"},
-                },
-                "required": ["path"],
-            },
-        },
-    },
-]
+AGENT_TOOLS = [{"type": "function", "function": {"name": n, "description": d,
+    "parameters": {"type": "object", "properties": {k: {"type": "string",
+        "description": v} for k, v in p.items()}, "required": list(p.keys())}}}
+    for n, d, p in [
+        ("write_file", "Write content to a file at the given path.",
+         {"path": "File path", "content": "File content"}),
+        ("read_file", "Read a file and return its contents.", {"path": "File path"}),
+        ("run_command", "Run a shell command and return stdout.",
+         {"command": "Shell command"}),
+        ("list_files", "List files in a directory.", {"path": "Directory path"}),
+    ]]
 
 
 def _read_env_key(key: str) -> str:
@@ -291,10 +243,18 @@ def generate_with_tools(prompt: str, model: str | None = None, max_turns: int = 
     prompt, _ = guard(prompt)
     return _clawcode_generate(prompt, model, max_turns=max_turns)
 
+def validate_twitter_credentials() -> dict:
+    """Validate Twitter credentials. Delegates to twitter_post (single source of truth)."""
+    from twitter_post import validate_twitter_credentials as _validate
+    return _validate()
+
+
 def self_test() -> bool:
-    """Verify backend config and domain gate."""
+    """Verify backend config, domain gate, and twitter validation wiring."""
     assert get_backend() in ("clawcode", "claudecode"), "bad backend"
     assert isinstance(get_model(), str), "model not str"
     assert _check_domain("http://localhost:11434"), "localhost blocked"
     assert not _check_domain("https://evil.com"), "evil allowed"
+    v = validate_twitter_credentials()
+    assert "status" in v and "detail" in v, "validate shape wrong"
     return True

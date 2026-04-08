@@ -1,4 +1,5 @@
 """post_flows.py — Tweet and Instagram post flows for the tools panel."""
+# Working app: 2040419672282087424anomalia939
 import json
 import time
 from pathlib import Path
@@ -141,9 +142,10 @@ def handle_confirm_tweet(tweet_text):
         return (msg, _hide(), _show(), _show(), _show())
     if not tweet_text or not tweet_text.strip():
         return _out("**Error:** No tweet text.")
-    from twitter_post import check_twitter_ready, post_tweet
-    if not check_twitter_ready():
-        return _out("**Error:** Twitter credentials not set.")
+    from twitter_post import validate_twitter_credentials, post_tweet
+    v = validate_twitter_credentials()
+    if v["status"] != "ready":
+        return _out(f"**Error:** {v['detail']}")
     result = post_tweet(tweet_text.strip())
     if result.get("success"):
         tid = result.get("tweet_id", "")
