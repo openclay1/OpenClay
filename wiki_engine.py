@@ -134,14 +134,6 @@ def save_ingest_result(filepath: Path, llm_output: str) -> list[str]:
         created.append(f"sources/{source_slug}.md")
     for c in created:
         _append_log("ingest", f"Created {c} from {filepath.name}")
-    # Store in MemPalace for semantic search (L3)
-    try:
-        from mem_palace import ingest_to_palace
-        for c in created:
-            p = WIKI_DIR / c
-            if p.exists(): ingest_to_palace(p, _read(p))
-    except Exception:
-        pass
     rebuild_index()
     return created
 
@@ -149,15 +141,17 @@ def save_ingest_result(filepath: Path, llm_output: str) -> list[str]:
 
 def build_query_prompt(question: str) -> str:
     try:
-        from mem_palace import build_context
-        memory_ctx = build_context(question, include_l3=True)
+        from vibe_brain import build_context, needs_wiki
+        memory_ctx = build_context(question)
+        skip_wiki = not needs_wiki(question)
     except Exception:
-        memory_ctx = ""
-    index = _read(INDEX_PATH)[:400]
+        memory_ctx, skip_wiki = "", False
+    index = "" if skip_wiki else _read(INDEX_PATH)[:400]
     return (
         "Answer using the memory context below. Cite pages as [[name]].\n\n"
         f"{memory_ctx}\n\n"
-        f"INDEX:\n{index}\n\n---\n\nQUESTION: {question}\n\n"
+        + (f"INDEX:\n{index}\n\n" if index else "")
+        + f"---\n\nQUESTION: {question}\n\n"
         "If the context lacks info, say so. If the answer merits a new page, "
         "suggest: 'File as concept: [title]'\n"
     )

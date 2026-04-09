@@ -61,21 +61,21 @@ intention → ClayRuntime [guard → permission gate → execute → validate ou
                 ↓
     agent_backend → Ollama (gemma4:e4b / gemma4:26b)
                 ↓
-    mem_palace [L0 identity → L1 session → L2 recent → L3 archive]
+    vibe_brain [L0 SOUL.md → L1 BRAIN.md → L2 SESSION.md → L3 DECISIONS.md]
                 ↓
     memory ← wiki ← logs ← self_build_loop
 ```
 
-### Memory architecture (MemPalace)
+### Memory architecture (Vibe Brain)
 
 | Level | What | Loaded when | Size |
 |-------|------|-------------|------|
 | L0 | Identity (SOUL.md core traits) | Always | ~100 tokens |
-| L1 | Session (current task, recent decisions) | Always | ~500 tokens |
-| L2 | Recent wiki (last 7 days) | Always | ~500 tokens |
-| L3 | Deep archive (full wiki, ChromaDB) | On demand only | Unlimited |
+| L1 | Long-term knowledge (BRAIN.md) | Always | <500 words |
+| L2 | Current task context (SESSION.md) | Always | <200 words |
+| L3 | Past decisions (DECISIONS.md) | On demand only | Unlimited |
 
-OpenClay remembers everything you've ever told it, but only loads what's relevant to the current task. L3 uses semantic search via ChromaDB — no keyword matching, no brute force. Falls back to keyword search if MemPalace is not installed.
+Plain markdown memory. No databases. No embeddings. No cloud. BRAIN.md stays under 500 words via a compression cycle that runs every 10 completed tasks. Default load (L0+L1+L2) stays under 2,000 tokens.
 
 ### Model routing tiers
 
@@ -106,7 +106,7 @@ model_router.py     — LOCAL_FAST / LOCAL_SMART / CLOUD routing
 input_guard.py      — prompt injection detection + sanitization
 permissions.py      — GREEN/YELLOW/RED action tiers + domain allowlist
 wiki_engine.py      — wiki: ingest, query, lint
-mem_palace.py       — 4-level memory (L0 identity → L3 archive)
+vibe_brain.py       — plain markdown memory (BRAIN.md, SESSION.md, DECISIONS.md)
 memory.py           — AGENTS.md persistent memory
 twitter_post.py     — tweet posting (optional, Tweepy)
 post_flows.py       — social post workflows

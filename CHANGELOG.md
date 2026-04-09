@@ -3,8 +3,8 @@
 ## v1.1.0 — 2026-04-08
 
 ### Added
-- mem_palace.py — 4-level memory architecture (L0 identity, L1 session, L2 recent, L3 archive)
-- MemPalace integration (github.com/milla-jovovich/mempalace) for semantic wiki search
+- vibe_brain.py — plain markdown memory (BRAIN.md, SESSION.md, DECISIONS.md)
+- Vibe Brain compression cycle: every 10 tasks, SESSION → BRAIN, trimmed to 500 words
 - "Why not cloud agents?" positioning in README
 - Industries section: healthcare, finance, operations, research
 - Conversational first screen: "What are we working on?" with starter actions
@@ -14,15 +14,15 @@
 
 ### Changed
 - wiki_engine.py — query retrieval now uses L0-L3 memory context instead of keyword matching
-- wiki_engine.py — ingest now stores in MemPalace ChromaDB for semantic search
+- wiki_engine.py — query now loads Vibe Brain context first, skips wiki if covered
 - panel.py — conversational greeting, Twitter moved to optional accordion
 - README.md — daily utility positioning, Twitter clearly optional
 - 22 self_tests (was 21), all passing
 
 ### Architecture
-- Memory: L0 (SOUL.md) → L1 (session) → L2 (7-day wiki) → L3 (ChromaDB semantic)
-- Graceful fallback to keyword search if mempalace not installed
-- predict_engine.py planned (roadmap) — MemPalace provides the memory foundation
+- Memory: L0 (SOUL.md) → L1 (BRAIN.md) → L2 (SESSION.md) → L3 (DECISIONS.md)
+- No external dependencies — plain markdown files, no chromadb/embeddings
+- Token target: under 2,000 tokens loaded per task by default
 
 ## v1.0.0 — 2026-04-07
 
