@@ -89,6 +89,15 @@ _FOLLOW_UPS: list[tuple[list[str], list[str]]] = [
             "Check that BRAIN.md is still under 500 words",
         ],
     ),
+    (
+        ["paper", "biotech", "literature", "review", "abstract",
+         "clinical", "trial", "ingest"],
+        [
+            "Write a hypothesis based on the gap analysis",
+            "Update protocol document with new findings",
+            "Search for studies that contradict current conclusions",
+        ],
+    ),
 ]
 
 # Fallback when no patterns match
