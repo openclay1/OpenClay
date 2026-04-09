@@ -1,5 +1,29 @@
 # Changelog
 
+## v1.1.0 — 2026-04-08
+
+### Added
+- mem_palace.py — 4-level memory architecture (L0 identity, L1 session, L2 recent, L3 archive)
+- MemPalace integration (github.com/milla-jovovich/mempalace) for semantic wiki search
+- "Why not cloud agents?" positioning in README
+- Industries section: healthcare, finance, operations, research
+- Conversational first screen: "What are we working on?" with starter actions
+- Daily Work section: 6 common task buttons
+- Local Success section: wiki pages, queued tasks, self-builds, artifacts
+- QUICKSTART.md first-time user guide
+
+### Changed
+- wiki_engine.py — query retrieval now uses L0-L3 memory context instead of keyword matching
+- wiki_engine.py — ingest now stores in MemPalace ChromaDB for semantic search
+- panel.py — conversational greeting, Twitter moved to optional accordion
+- README.md — daily utility positioning, Twitter clearly optional
+- 22 self_tests (was 21), all passing
+
+### Architecture
+- Memory: L0 (SOUL.md) → L1 (session) → L2 (7-day wiki) → L3 (ChromaDB semantic)
+- Graceful fallback to keyword search if mempalace not installed
+- predict_engine.py planned (roadmap) — MemPalace provides the memory foundation
+
 ## v1.0.0 — 2026-04-07
 
 ### Added

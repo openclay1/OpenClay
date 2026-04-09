@@ -20,6 +20,21 @@ I am a local-first AI agent that runs on your machine. I help you get through yo
 - **Heal and improve myself** — retry failed calls, auto-fix recurring errors, and run a constrained self-build loop that only keeps changes that pass all 21 tests.
 - **Guard every input and output** — prompt injection detection, permission tiers (GREEN/YELLOW/RED), output validation.
 
+## Why not cloud agents?
+
+Cloud-hosted AI agents are powerful. They run on someone else's servers, require their subscription, and your data passes through their infrastructure. When pricing changes, your workflow breaks. When a platform pivots, your agent disappears.
+
+OpenClay runs on your machine. Your data never leaves. No subscription can cut you off. No platform can change the rules on you. Same capability. Full ownership.
+
+If the cloud goes down, OpenClay keeps working. If a provider raises prices, OpenClay costs nothing. If a company pivots to healthcare or enterprise, OpenClay still answers to you.
+
+## Industries
+
+- **Healthcare and life sciences.** Keep patient notes, research summaries, and clinical references in a local wiki that never touches a cloud server.
+- **Finance and accounting.** Ingest transaction records, draft expense reports, and maintain audit trails — all on hardware you control.
+- **Operations and file management.** Organize folders, clean up downloads, find duplicates, and maintain structured archives without uploading anything.
+- **Research and knowledge work.** Build a compounding knowledge base from papers, transcripts, and notes — query it in plain language, keep it forever.
+
 ## How to run me
 
 ```bash
@@ -46,8 +61,21 @@ intention → ClayRuntime [guard → permission gate → execute → validate ou
                 ↓
     agent_backend → Ollama (gemma4:e4b / gemma4:26b)
                 ↓
+    mem_palace [L0 identity → L1 session → L2 recent → L3 archive]
+                ↓
     memory ← wiki ← logs ← self_build_loop
 ```
+
+### Memory architecture (MemPalace)
+
+| Level | What | Loaded when | Size |
+|-------|------|-------------|------|
+| L0 | Identity (SOUL.md core traits) | Always | ~100 tokens |
+| L1 | Session (current task, recent decisions) | Always | ~500 tokens |
+| L2 | Recent wiki (last 7 days) | Always | ~500 tokens |
+| L3 | Deep archive (full wiki, ChromaDB) | On demand only | Unlimited |
+
+OpenClay remembers everything you've ever told it, but only loads what's relevant to the current task. L3 uses semantic search via ChromaDB — no keyword matching, no brute force. Falls back to keyword search if MemPalace is not installed.
 
 ### Model routing tiers
 
@@ -65,7 +93,7 @@ intention → ClayRuntime [guard → permission gate → execute → validate ou
 | YELLOW | Auto-execute, logged | Install stack, pull models, read public URLs |
 | RED | Blocked until approved | Post tweet, run shell command, delete data |
 
-Every module stays under 300 lines. Every module has a `self_test()`. All 21 pass.
+Every module stays under 300 lines. Every module has a `self_test()`. All 22 pass.
 
 ### Project structure
 
@@ -78,6 +106,7 @@ model_router.py     — LOCAL_FAST / LOCAL_SMART / CLOUD routing
 input_guard.py      — prompt injection detection + sanitization
 permissions.py      — GREEN/YELLOW/RED action tiers + domain allowlist
 wiki_engine.py      — wiki: ingest, query, lint
+mem_palace.py       — 4-level memory (L0 identity → L3 archive)
 memory.py           — AGENTS.md persistent memory
 twitter_post.py     — tweet posting (optional, Tweepy)
 post_flows.py       — social post workflows

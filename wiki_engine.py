@@ -134,29 +134,31 @@ def save_ingest_result(filepath: Path, llm_output: str) -> list[str]:
         created.append(f"sources/{source_slug}.md")
     for c in created:
         _append_log("ingest", f"Created {c} from {filepath.name}")
+    # Store in MemPalace for semantic search (L3)
+    try:
+        from mem_palace import ingest_to_palace
+        for c in created:
+            p = WIKI_DIR / c
+            if p.exists(): ingest_to_palace(p, _read(p))
+    except Exception:
+        pass
     rebuild_index()
     return created
 
 # ─── Query ───
 
 def build_query_prompt(question: str) -> str:
-    index = _read(INDEX_PATH)
-    overview = _read(OVERVIEW_PATH)[:500]
-    q_words = [w for w in question.lower().split() if len(w) > 3]
-    relevant = []
-    for d in [CONCEPTS_DIR, ENTITIES_DIR, SOURCES_DIR, COMPARISONS_DIR, TOPICS_DIR]:
-        for f in _scan(d):
-            content = _read(f)
-            if (question.lower() in content.lower() or
-                    any(w in f.stem.lower() for w in q_words)):
-                relevant.append(f"### {f.relative_to(WIKI_DIR)}\n{content[:600]}")
-            if len(relevant) >= 8: break
-    rel_text = "\n\n".join(relevant) or "_No matching pages._"
+    try:
+        from mem_palace import build_context
+        memory_ctx = build_context(question, include_l3=True)
+    except Exception:
+        memory_ctx = ""
+    index = _read(INDEX_PATH)[:400]
     return (
-        "Answer using ONLY wiki pages below. Cite pages as [[name]].\n\n"
-        f"INDEX:\n{index[:800]}\n\nOVERVIEW:\n{overview}\n\n"
-        f"RELEVANT PAGES:\n{rel_text}\n\n---\n\nQUESTION: {question}\n\n"
-        "If wiki lacks info, say so. If the answer merits a new page, "
+        "Answer using the memory context below. Cite pages as [[name]].\n\n"
+        f"{memory_ctx}\n\n"
+        f"INDEX:\n{index}\n\n---\n\nQUESTION: {question}\n\n"
+        "If the context lacks info, say so. If the answer merits a new page, "
         "suggest: 'File as concept: [title]'\n"
     )
 
