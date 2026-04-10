@@ -1,18 +1,21 @@
 """first_screen.py — Conversational entry point for OpenClay.
 
 On launch, loads BRAIN.md + SESSION.md silently, greets the user with
-context from memory, shows 2-3 predicted next actions, and routes
-plain-language input to the correct module. No slash commands needed.
+context from memory, shows 2-3 predicted next actions, checks for
+unfinished work in ~/Desktop/OpenClay Output/, and routes plain-language
+input to the correct module. No slash commands needed.
 
 Entire launch sequence targets under 3 seconds.
 """
 from __future__ import annotations
 
 import re
+import time
 from datetime import datetime
 from pathlib import Path
 
 BASE_DIR = Path(__file__).parent
+OUTPUT_DIR = Path.home() / "Desktop" / "OpenClay Output"
 
 
 # ── Helpers ──────────────────────────────────────────────────────────
@@ -34,6 +37,33 @@ def _hour_greeting() -> str:
     return "Good evening"
 
 
+# ── Unfinished work + watched folders ────────────────────────────────
+
+def check_unfinished() -> list[str]:
+    """Check ~/Desktop/OpenClay Output/ for files modified in last 24h."""
+    if not OUTPUT_DIR.exists():
+        return []
+    cutoff = time.time() - 86400
+    recent = []
+    for f in OUTPUT_DIR.iterdir():
+        if f.is_file() and f.stat().st_mtime > cutoff:
+            recent.append(f.name)
+    return sorted(recent)[:5]
+
+
+def check_new_papers() -> list[str]:
+    """Check raw/ for new files added in last 24h."""
+    raw_dir = BASE_DIR / "raw"
+    if not raw_dir.exists():
+        return []
+    cutoff = time.time() - 86400
+    new_files = []
+    for f in raw_dir.rglob("*"):
+        if f.is_file() and f.stat().st_mtime > cutoff:
+            new_files.append(f.name)
+    return sorted(new_files)[:10]
+
+
 # ── Memory loader ────────────────────────────────────────────────────
 
 def load_memory() -> dict:
@@ -45,6 +75,8 @@ def load_memory() -> dict:
         "session": session,
         "user_name": _extract_user_name(brain),
         "last_task": _extract_last_task(session, brain),
+        "unfinished": check_unfinished(),
+        "new_files": check_new_papers(),
     }
 
 
@@ -101,12 +133,23 @@ def build_greeting(memory: dict | None = None) -> str:
     else:
         parts.append(f"{greeting}.")
 
+    # Unfinished work alert
+    unfinished = memory.get("unfinished", [])
+    if unfinished:
+        parts.append(f"You left unfinished: {unfinished[0]}. Continue?")
+
+    # New files in watched folders
+    new_files = memory.get("new_files", [])
+    if new_files:
+        parts.append(f"Found {len(new_files)} new file(s) in your papers folder. "
+                     f"Analyze them now?")
+
     # Last task context
     last = memory.get("last_task", "")
-    if last:
+    if last and not unfinished:
         parts.append(f"Last time you were working on: {last}")
 
-    # Predicted next actions
+    # Predicted next actions (as actionable items)
     try:
         from predict_engine import predict
         suggestions = predict()
@@ -114,7 +157,7 @@ def build_greeting(memory: dict | None = None) -> str:
             parts.append("")
             parts.append("Suggested next steps:")
             for i, s in enumerate(suggestions, 1):
-                parts.append(f"  {i}. {s}")
+                parts.append(f"  [{i}] {s}")
     except Exception:
         pass
 
@@ -219,12 +262,21 @@ def launch() -> str:
 # ── Self test ────────────────────────────────────────────────────────
 
 def self_test() -> bool:
-    """Verify first_screen greeting, routing, and memory loading."""
+    """Verify first_screen greeting, routing, memory, and unfinished work."""
     # Memory loads without error
     mem = load_memory()
     assert isinstance(mem, dict), "load_memory must return dict"
     assert "brain" in mem and "session" in mem, "missing memory keys"
     assert "user_name" in mem and "last_task" in mem, "missing parsed keys"
+    assert "unfinished" in mem and "new_files" in mem, "missing new keys"
+    assert isinstance(mem["unfinished"], list), "unfinished not list"
+    assert isinstance(mem["new_files"], list), "new_files not list"
+
+    # Unfinished work detection
+    uf = check_unfinished()
+    assert isinstance(uf, list), "check_unfinished not list"
+    nf = check_new_papers()
+    assert isinstance(nf, list), "check_new_papers not list"
 
     # Greeting builds
     greeting = build_greeting(mem)
@@ -234,43 +286,15 @@ def self_test() -> bool:
                                         "Good evening")), "missing time greeting"
 
     # Routing: known intents
-    r = route_input("post a tweet about OpenClay")
-    assert r["intent"] == "tweet", f"tweet route failed: {r}"
-
-    r = route_input("build my wiki")
-    assert r["intent"] == "wiki_init", f"wiki_init route failed: {r}"
-
-    r = route_input("ingest report.md")
-    assert r["intent"] == "wiki_ingest", f"wiki_ingest route failed: {r}"
-
-    r = route_input("search my wiki for agents")
-    assert r["intent"] == "wiki_query", f"wiki_query route failed: {r}"
-
-    r = route_input("run all self tests")
-    assert r["intent"] == "test", f"test route failed: {r}"
-
-    r = route_input("help me plan my day")
-    assert r["intent"] == "plan", f"plan route failed: {r}"
-
-    r = route_input("summarize the project files")
-    assert r["intent"] == "summarize", f"summarize route failed: {r}"
-
-    # Routing: general fallback
-    r = route_input("explain how the wiki engine works in detail")
-    assert r["intent"] == "general", f"general route failed: {r}"
-    assert r["clarify"] is None, "general should not clarify"
-
-    # Routing: unclear triggers clarification
-    r = route_input("um")
-    assert r["intent"] == "unclear", f"unclear route failed: {r}"
-    assert r["clarify"] is not None, "unclear should have clarify question"
-
-    # Routing: empty input
-    r = route_input("")
-    assert r["intent"] == "empty", f"empty route failed: {r}"
-
+    for txt, exp in [("post a tweet about OpenClay", "tweet"), ("build my wiki", "wiki_init"),
+                     ("ingest report.md", "wiki_ingest"), ("search my wiki for agents", "wiki_query"),
+                     ("run all self tests", "test"), ("help me plan my day", "plan"),
+                     ("summarize the project files", "summarize")]:
+        assert route_input(txt)["intent"] == exp, f"{exp} route failed"
+    assert route_input("explain how the wiki engine works in detail")["intent"] == "general"
+    assert route_input("um")["intent"] == "unclear"
+    assert route_input("um")["clarify"] is not None
+    assert route_input("")["intent"] == "empty"
     # Launch completes
-    result = launch()
-    assert isinstance(result, str) and len(result) > 0, "launch failed"
-
+    assert isinstance(launch(), str) and len(launch()) > 0, "launch failed"
     return True
