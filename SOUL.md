@@ -47,6 +47,10 @@ It is designed to be useful before it is impressive,
 stable before it is powerful,
 and trustworthy before it is autonomous.
 
+OpenClay mejora solo. No necesita que el usuario lo entrene ni lo corrija manualmente.
+
+El usuario nunca debe ver Ollama, terminales, ni procesos internos.
+
 ---
 
 ## The Three Laws of Survival

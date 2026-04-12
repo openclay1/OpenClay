@@ -2,43 +2,95 @@
 
 <!-- Long-term knowledge. Updated by compression cycle. -->
 <!-- Last updated: 2026-04-09 10:20 -->
+- [2026-04-09 16:59] compress_test_4 → ok
+- [2026-04-09 16:59] compress_test_5 → ok
+- [2026-04-09 16:59] compress_test_6 → ok
+- [2026-04-09 16:59] compress_test_7 → ok
+- [2026-04-09 16:59] compress_test_8 → ok
 
-## Machine
-- OS: Darwin 24.6.0
-- RAM: 16384MB
-- Tier: medium-low
+## Session 2026-04-09 17:08
+- [2026-04-09 17:08] test_task_alpha → passed
+- [2026-04-09 17:08] compress_test_0 → ok
+- [2026-04-09 17:08] compress_test_1 → ok
+- [2026-04-09 17:08] compress_test_2 → ok
+- [2026-04-09 17:08] compress_test_3 → ok
+- [2026-04-09 17:08] compress_test_4 → ok
+- [2026-04-09 17:08] compress_test_5 → ok
+- [2026-04-09 17:08] compress_test_6 → ok
+- [2026-04-09 17:08] compress_test_7 → ok
+- [2026-04-09 17:08] compress_test_8 → ok
 
-## Patterns
-- Primary model tier: gemma4 (e4b fast, 26b smart)
-- Twitter posting has failed before (401 Unauthorized)
-- User is a creator, not a traditional developer
-- Self-build loop works — applied wiki_engine fix successfully
+## Session 2026-04-09 17:10
+- [2026-04-09 17:10] test_task_alpha → passed
+- [2026-04-09 17:10] compress_test_0 → ok
+- [2026-04-09 17:10] compress_test_1 → ok
+- [2026-04-09 17:10] compress_test_2 → ok
+- [2026-04-09 17:10] compress_test_3 → ok
+- [2026-04-09 17:10] compress_test_4 → ok
+- [2026-04-09 17:10] compress_test_5 → ok
+- [2026-04-09 17:10] compress_test_6 → ok
+- [2026-04-09 17:10] compress_test_7 → ok
+- [2026-04-09 17:10] compress_test_8 → ok
 
-## User
-- Solo builder automating from their machine
-- Values: local-first, privacy, reliability over features
-- Profile: creator archetype, content pipeline focus
+## Session 2026-04-09 20:48
+- [2026-04-09 20:48] test_task_alpha → passed
+- [2026-04-09 20:48] compress_test_0 → ok
+- [2026-04-09 20:48] compress_test_1 → ok
+- [2026-04-09 20:48] compress_test_2 → ok
+- [2026-04-09 20:48] compress_test_3 → ok
+- [2026-04-09 20:48] compress_test_4 → ok
+- [2026-04-09 20:48] compress_test_5 → ok
+- [2026-04-09 20:48] compress_test_6 → ok
+- [2026-04-09 20:48] compress_test_7 → ok
+- [2026-04-09 20:48] compress_test_8 → ok
 
-## Session 2026-04-09 10:23
-- [2026-04-09 10:23] test_task_alpha → passed
-- [2026-04-09 10:23] compress_test_0 → ok
-- [2026-04-09 10:23] compress_test_1 → ok
-- [2026-04-09 10:23] compress_test_2 → ok
-- [2026-04-09 10:23] compress_test_3 → ok
-- [2026-04-09 10:23] compress_test_4 → ok
-- [2026-04-09 10:23] compress_test_5 → ok
-- [2026-04-09 10:23] compress_test_6 → ok
-- [2026-04-09 10:23] compress_test_7 → ok
-- [2026-04-09 10:23] compress_test_8 → ok
+## Session 2026-04-10 09:37
+- [2026-04-10 09:37] test_task_alpha → passed
+- [2026-04-10 09:37] compress_test_0 → ok
+- [2026-04-10 09:37] compress_test_1 → ok
+- [2026-04-10 09:37] compress_test_2 → ok
+- [2026-04-10 09:37] compress_test_3 → ok
+- [2026-04-10 09:37] compress_test_4 → ok
+- [2026-04-10 09:37] compress_test_5 → ok
+- [2026-04-10 09:37] compress_test_6 → ok
+- [2026-04-10 09:37] compress_test_7 → ok
+- [2026-04-10 09:37] compress_test_8 → ok
 
-## Session 2026-04-09 16:52
-- [2026-04-09 16:52] test_task_alpha → passed
-- [2026-04-09 16:52] compress_test_0 → ok
-- [2026-04-09 16:52] compress_test_1 → ok
-- [2026-04-09 16:52] compress_test_2 → ok
-- [2026-04-09 16:52] compress_test_3 → ok
-- [2026-04-09 16:52] compress_test_4 → ok
-- [2026-04-09 16:52] compress_test_5 → ok
-- [2026-04-09 16:52] compress_test_6 → ok
-- [2026-04-09 16:52] compress_test_7 → ok
-- [2026-04-09 16:52] compress_test_8 → ok
+## Session 2026-04-10 17:15
+- [2026-04-10 17:15] test_task_alpha → passed
+- [2026-04-10 17:15] compress_test_0 → ok
+- [2026-04-10 17:15] compress_test_1 → ok
+- [2026-04-10 17:15] compress_test_2 → ok
+- [2026-04-10 17:15] compress_test_3 → ok
+- [2026-04-10 17:15] compress_test_4 → ok
+- [2026-04-10 17:15] compress_test_5 → ok
+- [2026-04-10 17:15] compress_test_6 → ok
+- [2026-04-10 17:15] compress_test_7 → ok
+- [2026-04-10 17:15] compress_test_8 → ok
+
+## Session 2026-04-10 17:16
+- [2026-04-10 17:16] test_task_alpha → passed
+- [2026-04-10 17:16] compress_test_0 → ok
+- [2026-04-10 17:16] compress_test_1 → ok
+- [2026-04-10 17:16] compress_test_2 → ok
+- [2026-04-10 17:16] compress_test_3 → ok
+- [2026-04-10 17:16] compress_test_4 → ok
+- [2026-04-10 17:16] compress_test_5 → ok
+- [2026-04-10 17:16] compress_test_6 → ok
+- [2026-04-10 17:16] compress_test_7 → ok
+- [2026-04-10 17:16] compress_test_8 → ok
+
+## Integrations
+
+## Session 2026-04-12 12:53
+- [2026-04-12 12:53] test_task_alpha → passed
+- [2026-04-12 12:53] compress_test_0 → ok
+- [2026-04-12 12:53] compress_test_1 → ok
+- [2026-04-12 12:53] compress_test_2 → ok
+- [2026-04-12 12:53] compress_test_3 → ok
+- [2026-04-12 12:53] compress_test_4 → ok
+- [2026-04-12 12:53] compress_test_5 → ok
+- [2026-04-12 12:53] compress_test_6 → ok
+- [2026-04-12 12:53] compress_test_7 → ok
+- [2026-04-12 12:53] compress_test_8 → ok
+- RESEARCH_PROFILE: oncology

@@ -87,7 +87,29 @@
       "Bash(python3 -c \"import socket; s=socket.socket\\(socket.AF_INET,socket.SOCK_DGRAM\\); s.connect\\(\\(''8.8.8.8'',80\\)\\); print\\(''Local IP:'', s.getsockname\\(\\)[0]\\); s.close\\(\\)\")",
       "Bash(python3 -c \"from mobile_bridge import self_test; print\\(''mobile_bridge:'', self_test\\(\\)\\)\")",
       "Bash(python3 -c \"from self_build_loop import self_test; print\\(''self_build_loop:'', self_test\\(\\)\\)\")",
-      "Bash(python3 -c \"import sys,json; print\\(''''config version:'''', json.load\\(sys.stdin\\).get\\(''''version'''',''''not set''''\\)\\)\")"
+      "Bash(python3 -c \"import sys,json; print\\(''''config version:'''', json.load\\(sys.stdin\\).get\\(''''version'''',''''not set''''\\)\\)\")",
+      "Bash(du -sh \"/Users/no_ta/Desktop/Open Clay\"/*/)",
+      "Bash(ls -la \"/Users/no_ta/Desktop/Open Clay/\"*_log* \"/Users/no_ta/Desktop/Open Clay/\"*decisions*)",
+      "Bash(ollama rm:*)",
+      "Bash(python3 -c ':*)",
+      "Bash(gh api:*)",
+      "Bash(python3 -c \"from vibe_brain import seed_brain; seed_brain\\(\\); print\\(open\\('BRAIN.md'\\).read\\(\\)\\)\")",
+      "Bash(rm -f wiki/LOCAL_PAPERS.md REVIEW_SUMMARY.md)",
+      "Bash(rm -rf wiki/papers)",
+      "Bash(chmod +x \"/Users/no_ta/Desktop/Open Clay/run_openclay.command\")",
+      "Bash(python3 workflow_simulator.py)",
+      "Bash(python3 -c \"from predict_engine import _FOLLOW_UPS; print\\(f'{len\\(_FOLLOW_UPS\\)} categories'\\)\")",
+      "Bash(python3 -c \"from predict_engine import self_test; print\\('self_test:', self_test\\(\\)\\)\")",
+      "Bash(python3 -c \"from model_config import self_test; print\\('self_test:', self_test\\(\\)\\)\")",
+      "Bash(python3 -c \"from vibe_brain import self_test; print\\('self_test:', self_test\\(\\)\\)\")",
+      "Bash(xargs -I{} basename {})",
+      "Bash(python3 -c \"from first_screen import self_test; print\\('self_test:', self_test\\(\\)\\)\")",
+      "Bash(python3 -c \"from daily_agents import self_test; print\\('self_test:', self_test\\(\\)\\)\")",
+      "Bash(python3 -c \"from integration_detector import self_test; print\\('self_test:', self_test\\(\\)\\)\")",
+      "Bash(python3 openclay_icon.py)",
+      "Bash(python3 -c \"from PIL import Image; img=Image.open\\('openclay_512.png'\\); print\\(f'Size: {img.size}'\\)\")",
+      "Bash(python3 biotech_review_agent.py)",
+      "Bash(chmod +x build_mac_app.sh build_dmg.sh)"
     ]
   }
 }

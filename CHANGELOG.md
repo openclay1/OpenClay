@@ -1,5 +1,38 @@
 # Changelog
 
+## v1.2.0 — 2026-04-12
+
+### Added
+- Trust onboarding: 4-screen first-launch flow with ChatGPT comparison (first_screen.py)
+- 7 daily agents: clinical_notes, lab_deviation, vet_soap, research_grant, admin_relief, accounting_audit, medical_billing (daily_agents.py)
+- Trust footer on ALL agent outputs: Fuente/Modelo/Timestamp/Confianza bilingual block
+- audit_log.py — one-line-per-run audit trail with monthly auto-archive
+- voice_input.py — SpeechRecognition + Whisper local transcription + PersonaPlex future layer
+- openclay_icon.py — Pillow-generated 512x512 app icon
+- biotech_review_agent.py — local literature review with gap analysis
+- Build scripts: build_mac_app.sh, build_dmg.sh, build_windows_exe.bat
+- HUMAN_INTEGRATION_MANUAL.md (EN + ES) + DESK_CARD_PRINT.md
+- Research profiles: oncology, pharma, engineering, veterinary, medical_billing (model_config.py)
+- MedGemma 4B auto-recommendation when medical software detected
+- Ollama hidden management: auto-start/stop, user never sees terminal
+- Zotero PDF watcher + Obsidian YAML frontmatter output (integration_detector.py)
+- Idle-time auto-processing in vibe_brain.py (after 10min idle)
+- GRANT_EXHIBIT_A.md
+- workflow_simulator.py — 17-step clinical/pharma/vet/grant workflows
+
+### Changed
+- integration_detector.py — expanded from 13 to 35+ detection targets (hospital, pharma, vet, research, engineering, accounting)
+- model_config.py — 5-tier hardware-aware selection (1.5B → 35B Q8), research profile auto-config
+- predict_engine.py — removed tweet category (9 groups, was 10)
+- SOUL.md — added self-improvement + hidden internals principles
+- requirements.txt — pinned versions with Spanish comments
+
+### Architecture
+- 103 assertions across 11 modules, all passing
+- All modules under 300 lines
+- Memory: L0 (SOUL.md) → L1 (BRAIN.md) → L2 (SESSION.md) → L3 (DECISIONS.md)
+- Bilingual ES/EN throughout all outputs, UI strings, and documentation
+
 ## v1.1.0 — 2026-04-08
 
 ### Added

@@ -83,11 +83,22 @@ def _run_text_input(text: str, lang: str) -> str:
 def build_gui():
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
     lang = detect_system_lang()
+    # Launch Ollama hidden in background
+    try:
+        from model_config import start_ollama_hidden, stop_ollama
+        start_ollama_hidden()
+    except Exception: pass
     root = Tk()
     root.title("OpenClay")
     root.geometry("900x680")
     root.configure(bg=BG)
     root.resizable(True, True)
+    def _on_close():
+        try:
+            from model_config import stop_ollama; stop_ollama()
+        except Exception: pass
+        root.destroy()
+    root.protocol("WM_DELETE_WINDOW", _on_close)
 
     # ── TOP: Greeting ──
     greet_frame = Frame(root, bg=BG, padx=16, pady=12)
@@ -120,7 +131,7 @@ def build_gui():
     right = Frame(center, bg=SURFACE, bd=1, relief="solid", padx=12, pady=12)
     right.pack(side=RIGHT, fill=BOTH, expand=True, padx=(8, 0))
     output_text = Text(right, wrap=WORD, font=("Helvetica", 11), fg=TEXT_CLR,
-                       bg=SURFACE, bd=0, height=15, state=DISABLED)
+                       bg=SURFACE, bd=0, height=20, state=DISABLED)
     output_text.pack(fill=BOTH, expand=True)
     btn_row = Frame(right, bg=SURFACE)
     btn_row.pack(fill=X, pady=(8, 0))
@@ -202,10 +213,29 @@ def build_gui():
     # ── BOTTOM: Text input ──
     input_frame = Frame(root, bg=BG, padx=16, pady=(4, 12))
     input_frame.pack(fill=X, side=BOTTOM)
-    text_input = Entry(input_frame, font=("Helvetica", 12), fg=TEXT_CLR, bg=SURFACE,
+    input_row = Frame(input_frame, bg=BG)
+    input_row.pack(fill=X)
+    text_input = Entry(input_row, font=("Helvetica", 12), fg=TEXT_CLR, bg=SURFACE,
                        bd=1, relief="solid", insertbackground=TEXT_CLR)
     text_input.insert(0, t("what_need", lang))
-    text_input.pack(fill=X, ipady=8)
+    text_input.pack(fill=X, side=LEFT, expand=True, ipady=8)
+    def _on_voice():
+        try:
+            from voice_input import listen_once
+            _set_output("🔴 Escuchando... / Listening..." if lang == "es"
+                        else "🔴 Listening... / Escuchando...")
+            def _vworker():
+                r = listen_once(timeout=5, phrase_limit=15)
+                if r["text"]:
+                    root.after(0, lambda: [text_input.delete(0, END), text_input.insert(0, r["text"])])
+                else:
+                    root.after(0, lambda: _set_output(r.get("error", "No speech detected.")))
+            threading.Thread(target=_vworker, daemon=True).start()
+        except ImportError:
+            _set_output("Voice input not available. Install: pip install SpeechRecognition")
+    voice_btn = Button(input_row, text="🎤", font=("Helvetica", 14), bg=PRIMARY,
+                       fg="#fff", bd=0, padx=10, cursor="hand2", command=_on_voice)
+    voice_btn.pack(side=RIGHT, padx=(6, 0))
     def _on_focus_in(e):
         if text_input.get() in (t("what_need", "es"), t("what_need", "en")):
             text_input.delete(0, END)

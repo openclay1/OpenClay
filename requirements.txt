@@ -1,4 +1,20 @@
+# Interfaz web de Gradio
 gradio>=4.0.0
+# Llamadas HTTP
 requests>=2.31.0
+# API de Anthropic (opcional, para modelo cloud)
 anthropic>=0.40.0
-tweepy>=4.14.0
+# Icono de la app
+Pillow==10.3.0
+# Empaquetar como .app/.exe
+PyInstaller==6.5.0
+# Entrada de voz
+SpeechRecognition==3.10.4
+# Transcripcion local con Whisper
+faster-whisper==1.0.3
+# Monitoreo de archivos
+watchdog==4.0.0
+# Leer archivos PDF
+PyMuPDF==1.23.26
+# Leer archivos Excel
+openpyxl==3.1.2

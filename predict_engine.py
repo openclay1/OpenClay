@@ -26,14 +26,6 @@ _FOLLOW_UPS: list[tuple[list[str], list[str]]] = [
         ],
     ),
     (
-        ["tweet", "post", "twitter", "social"],
-        [
-            "Check tweet engagement after 30 minutes",
-            "Draft a follow-up thread expanding on the topic",
-            "Schedule next post to maintain consistent cadence",
-        ],
-    ),
-    (
         ["clean", "storage", "disk", "rotate", "log"],
         [
             "Run self_tests to verify nothing broke during cleanup",
