@@ -109,7 +109,9 @@
       "Bash(python3 openclay_icon.py)",
       "Bash(python3 -c \"from PIL import Image; img=Image.open\\('openclay_512.png'\\); print\\(f'Size: {img.size}'\\)\")",
       "Bash(python3 biotech_review_agent.py)",
-      "Bash(chmod +x build_mac_app.sh build_dmg.sh)"
+      "Bash(chmod +x build_mac_app.sh build_dmg.sh)",
+      "Bash(ls *.py)",
+      "Bash(ls *.md)"
     ]
   }
 }

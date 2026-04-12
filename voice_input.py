@@ -1,9 +1,7 @@
 """voice_input.py — Local voice input for OpenClay.
-
-Uses SpeechRecognition library for microphone capture and transcription.
-Supports local Whisper or Google Web Speech as fallback.
-Auto-detects Spanish vs English from speech content.
-All transcription is local when possible.
+Uses SpeechRecognition + faster-whisper for transcription.
+Puerto Rican Spanish + code-switching support. Never auto-submits.
+User always confirms in editable field before sending.
 """
 from __future__ import annotations
 
@@ -21,6 +19,15 @@ ERROR = "error"
 _status = IDLE
 _last_text = ""
 _last_lang = "en"
+_auto_submit = False  # NEVER auto-submit — user must confirm
+
+# ── UI config ────────────────────────────────────────────────────────
+BUTTON_LABEL = "🎤 Hablar con OpenClay / Speak to OpenClay"
+LISTENING_LABEL = "🔴 Escuchando... / Listening..."
+ERROR_LABEL = "No entendi — ¿puedes repetirlo?"
+TOOLTIP = ("Tip: Para mejor resultado, usa AirPods o un microfono externo.\n"
+           "OpenClay tambien puede recibir voz desde tu telefono en la misma\n"
+           "red WiFi — proximamente.")
 
 
 def get_status() -> str:
@@ -176,6 +183,15 @@ def status_message(lang: str = "en") -> str:
     return msgs.get(_status, msgs[IDLE]).get(lang, msgs[_status]["en"])
 
 
+# ── Editable result (never auto-submit) ──────────────────────────────
+
+def get_editable_result() -> dict:
+    """Return transcription in editable field format. User must confirm before send."""
+    return {"text": _last_text, "lang": _last_lang, "editable": True,
+            "auto_submit": False,
+            "buttons_es": ["Enviar", "Intentar de nuevo"],
+            "buttons_en": ["Send", "Try again"]}
+
 # ── PersonaPlex future voice layer ───────────────────────────────────
 
 def check_personaplex_available() -> dict:
@@ -221,7 +237,15 @@ def self_test() -> bool:
     for lang in ("es", "en"):
         assert isinstance(status_message(lang), str) and len(status_message(lang)) > 0
     assert isinstance(list_microphones(), list)
-    # #49 PersonaPlex — gracefully returns False when no NVIDIA GPU
+    # Editable result — never auto-submit
+    er = get_editable_result()
+    assert er["auto_submit"] is False, "Must never auto-submit"
+    assert er["editable"] is True
+    assert "Enviar" in er["buttons_es"] and "Send" in er["buttons_en"]
+    # UI config
+    assert "Hablar" in BUTTON_LABEL and "Speak" in BUTTON_LABEL
+    assert TOOLTIP and "AirPods" in TOOLTIP
+    # #49/#54 PersonaPlex — gracefully returns False when no NVIDIA GPU
     pp = check_personaplex_available()
     assert isinstance(pp, dict) and "available" in pp and "has_gpu" in pp
     assert isinstance(pp["available"], bool)

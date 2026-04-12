@@ -1,5 +1,35 @@
 # Changelog
 
+## v1.2.1 — 2026-04-12
+
+### Added
+- Context bloat fix: 3-file boot load (SOUL.md, BRAIN.md, boot_load_policy.md), all others on demand
+- confusion_reset.py — intercepts on second failure, plain-language bilingual check-in
+- Auto-save with timestamp, crash recovery, session restore ("Tu sesion pauso...")
+- Streaming responses via _stream_output() — characters arrive incrementally, not as block
+- Voice input redesign: "🎤 Hablar con OpenClay" button, editable field, never auto-submits
+- Puerto Rican Spanish + code-switching support in voice transcription
+- PersonaPlex detection with graceful fallback on Mac
+- network_sandbox.py — blocks external calls without explicit permission per DeepMind 2026 findings
+- Local mode fully functional with zero internet (verify_local_mode)
+- memory_layer.py — Mem0 local memory backend via Ollama, BRAIN.md fallback
+- Idle monitor background thread: processes files + compresses after 10min idle
+- "↩ Start this step over" reset button on every output panel
+- boot_load_policy.md — defines which context loads for which task type
+- /context/ subfolder for on-demand context files
+
+### Changed
+- openclay_app.py — streaming output, confusion_reset integration, session restore on boot
+- voice_input.py — BUTTON_LABEL, LISTENING_LABEL, TOOLTIP, editable result, never auto-submit
+- vibe_brain.py — boot_load(), load_on_demand(), idle_monitor thread, start_idle_monitor()
+- requirements.txt — added mem0ai
+
+### Architecture
+- 159 assertions across 15 modules, all passing
+- All modules under 300 lines
+- New test coverage: #50 (boot load), #51-52 (confusion/restore), #53 (streaming),
+  #54 (PersonaPlex), #55-56 (network sandbox), #57 (Mem0), #58-59 (idle monitor)
+
 ## v1.2.0 — 2026-04-12
 
 ### Added

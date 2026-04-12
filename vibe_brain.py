@@ -13,10 +13,12 @@ BRAIN_PATH = BASE_DIR / "BRAIN.md"
 SESSION_PATH = BASE_DIR / "SESSION.md"
 DECISIONS_PATH = BASE_DIR / "DECISIONS.md"
 HEALING_LOG = BASE_DIR / "healing_log.md"
+BOOT_POLICY = BASE_DIR / "boot_load_policy.md"
 _task_count = 0
 _COMPRESS_EVERY = 10
 _IDLE_MINUTES = 10
 _last_activity = None
+_idle_thread = None
 
 def _now(): return datetime.now().strftime("%Y-%m-%d %H:%M")
 def _read(p): return p.read_text(encoding="utf-8") if p.exists() else ""
@@ -24,6 +26,27 @@ def _write(p, text): p.write_text(text, encoding="utf-8")
 def _append(p, text):
     with open(p, "a", encoding="utf-8") as f: f.write(text)
 def _word_count(text): return len(text.split())
+
+# ── Boot load (3 files only) ────────────────────────────────────────
+
+def boot_load() -> dict:
+    """Cold boot: load exactly 3 files — SOUL.md, BRAIN.md, boot_load_policy.md."""
+    return {"soul": _read(SOUL_PATH), "brain": _read(BRAIN_PATH),
+            "policy": _read(BOOT_POLICY), "files_loaded": ["SOUL.md", "BRAIN.md", "boot_load_policy.md"]}
+
+def load_on_demand(task_type: str) -> dict:
+    """Load context files for a specific task type (on demand, not at boot)."""
+    ctx_dir = BASE_DIR / "context"
+    mapping = {"clinical": "clinical_context.md", "research": "research_context.md",
+               "grant": "grant_context.md", "billing": "billing_context.md",
+               "veterinary": "vet_context.md"}
+    extra = {}
+    fname = mapping.get(task_type, "")
+    if fname and (ctx_dir / fname).exists(): extra["task_context"] = _read(ctx_dir / fname)
+    if task_type in ("clinical", "research", "grant", "billing", "veterinary", "review"):
+        extra["decisions"] = _read(DECISIONS_PATH)
+    if task_type in ("admin", "general", "review"): extra["session"] = _read(SESSION_PATH)
+    return extra
 
 # ── L0: Identity ────────────────────────────────────────────────────
 
@@ -195,6 +218,22 @@ def idle_greeting(lang: str = "en") -> str:
     if lang == "es" and n: return f"Mientras esperaba, analice {n} archivos nuevos. Quieres ver el resumen?"
     return f"While waiting, I analyzed {n} new files. Want to see the summary?" if n else ""
 
+def idle_monitor(check_interval: int = 60):
+    """Background thread: checks idle state, processes when idle > 10min."""
+    import time
+    _touch_activity()
+    while True:
+        time.sleep(check_interval)
+        if minutes_idle() >= _IDLE_MINUTES: idle_process()
+
+def start_idle_monitor():
+    """Start the idle monitor in a daemon thread."""
+    global _idle_thread
+    import threading
+    if _idle_thread and _idle_thread.is_alive(): return
+    _idle_thread = threading.Thread(target=idle_monitor, args=(60,), daemon=True)
+    _idle_thread.start()
+
 # ── Self test ────────────────────────────────────────────────────────
 
 def self_test() -> bool:
@@ -215,4 +254,21 @@ def self_test() -> bool:
     st = status()
     assert "brain_words" in st and "compress_threshold" in st
     assert callable(idle_process) and callable(idle_greeting)
+    # #50 — cold boot loads exactly 3 files
+    bl = boot_load()
+    assert len(bl["files_loaded"]) == 3, f"Boot should load exactly 3 files, got {len(bl['files_loaded'])}"
+    assert "SOUL.md" in bl["files_loaded"] and "BRAIN.md" in bl["files_loaded"]
+    assert "boot_load_policy.md" in bl["files_loaded"]
+    # On-demand loading
+    od = load_on_demand("clinical")
+    assert isinstance(od, dict)
+    od2 = load_on_demand("general")
+    assert isinstance(od2, dict)
+    # #58 — idle_monitor thread starts without error
+    import threading
+    start_idle_monitor()
+    assert _idle_thread is not None and _idle_thread.is_alive(), "idle_monitor thread should be running"
+    # #59 — idle greeting
+    ig = idle_greeting("es")
+    assert isinstance(ig, str)
     return True

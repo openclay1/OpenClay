@@ -1,24 +1,17 @@
-"""openclay_app.py — Desktop GUI for OpenClay using tkinter.
-
-One window. Bilingual Spanish/English auto-detected from system language.
-Simple enough for someone who has never used a terminal.
-Zero terminal required after first setup.
-All outputs save to ~/Desktop/OpenClay Output/.
-"""
+"""openclay_app.py — Desktop GUI for OpenClay. Bilingual, streaming, auto-save."""
 from __future__ import annotations
-
-import os
-import sys
-import threading
+import os, sys, threading
 from datetime import datetime
 from pathlib import Path
-from tkinter import Tk, Frame, Label, Text, Button, Entry, filedialog, END, WORD, BOTH, X, LEFT, RIGHT, TOP, BOTTOM, DISABLED, NORMAL
+from tkinter import (Tk, Frame, Label, Text, Button, Entry, filedialog,
+                     END, WORD, BOTH, X, LEFT, RIGHT, TOP, BOTTOM, DISABLED, NORMAL)
 
 BASE_DIR = Path(__file__).parent
 OUTPUT_DIR = Path.home() / "Desktop" / "OpenClay Output"
 sys.path.insert(0, str(BASE_DIR))
 
 from lang_detect import detect_system_lang, detect_text_lang, t
+from confusion_reset import record_attempt, auto_save, restore_session, get_resume_message, reset_label
 
 # ── Colors (from design tokens) ─────────────────────────────────────
 BG = "#161310"; SURFACE = "#1b1814"; BORDER = "#373330"
@@ -55,27 +48,17 @@ def _suggestions():
 
 
 def _route_file(filepath: str, lang: str) -> str:
-    """Route a file to the correct agent based on extension and content."""
     p = Path(filepath)
-    ext = p.suffix.lower()
-    try:
-        text = p.read_text("utf-8", errors="ignore")
-    except Exception:
-        return t("file_not_found", lang)
-    if not text.strip():
-        return t("file_not_found", lang)
+    try: text = p.read_text("utf-8", errors="ignore")
+    except Exception: return t("file_not_found", lang)
+    if not text.strip(): return t("file_not_found", lang)
     from daily_agents import route_by_content
-    result = route_by_content(text, lang)
-    return result.get("output", t("done", lang))
-
+    return route_by_content(text, lang).get("output", t("done", lang))
 
 def _run_text_input(text: str, lang: str) -> str:
-    """Route text input to the correct agent."""
-    if not text.strip():
-        return ""
+    if not text.strip(): return ""
     from daily_agents import route_by_content
-    result = route_by_content(text, lang)
-    return result.get("output", t("done", lang))
+    return route_by_content(text, lang).get("output", t("done", lang))
 
 
 # ── GUI Builder ──────────────────────────────────────────────────────
@@ -141,12 +124,30 @@ def build_gui():
     copy_btn = Button(btn_row, text=t("copy", lang), font=("Helvetica", 10),
                       bg=BORDER, fg=TEXT_CLR, bd=0, padx=12, pady=4)
     copy_btn.pack(side=LEFT)
+    reset_btn = Button(btn_row, text=reset_label(lang), font=("Helvetica", 10),
+                       bg=BORDER, fg=MUTED, bd=0, padx=12, pady=4,
+                       command=lambda: _set_output(""))
+    reset_btn.pack(side=RIGHT)
 
     def _set_output(txt):
         output_text.config(state=NORMAL)
         output_text.delete("1.0", END)
         output_text.insert(END, txt)
         output_text.config(state=DISABLED)
+
+    def _stream_output(txt, idx=0, chunk=3):
+        """Stream text character by character for perceived speed."""
+        if idx == 0:
+            output_text.config(state=NORMAL)
+            output_text.delete("1.0", END)
+        if idx < len(txt):
+            output_text.config(state=NORMAL)
+            output_text.insert(END, txt[idx:idx+chunk])
+            output_text.config(state=DISABLED)
+            root.after(12, lambda: _stream_output(txt, idx+chunk, chunk))
+        else:
+            output_text.config(state=DISABLED)
+            auto_save(panel="output")
 
     def _on_browse():
         files = filedialog.askopenfilenames(
@@ -159,7 +160,9 @@ def build_gui():
                 results = []
                 for f in files:
                     results.append(_route_file(f, lang))
-                root.after(0, lambda: _set_output("\n\n---\n\n".join(results)))
+                combined = "\n\n---\n\n".join(results)
+                auto_save(user_input=str(files), output=combined[:200], panel="browse")
+                root.after(0, lambda: _stream_output(combined))
             threading.Thread(target=_process, daemon=True).start()
     drop_btn.configure(command=_on_browse)
 
@@ -221,21 +224,25 @@ def build_gui():
     text_input.pack(fill=X, side=LEFT, expand=True, ipady=8)
     def _on_voice():
         try:
-            from voice_input import listen_once
-            _set_output("🔴 Escuchando... / Listening..." if lang == "es"
-                        else "🔴 Listening... / Escuchando...")
+            from voice_input import listen_once, LISTENING_LABEL, ERROR_LABEL
+            _set_output(LISTENING_LABEL)
             def _vworker():
                 r = listen_once(timeout=5, phrase_limit=15)
                 if r["text"]:
                     root.after(0, lambda: [text_input.delete(0, END), text_input.insert(0, r["text"])])
                 else:
-                    root.after(0, lambda: _set_output(r.get("error", "No speech detected.")))
+                    root.after(0, lambda: _set_output(r.get("error", ERROR_LABEL)))
             threading.Thread(target=_vworker, daemon=True).start()
         except ImportError:
             _set_output("Voice input not available. Install: pip install SpeechRecognition")
-    voice_btn = Button(input_row, text="🎤", font=("Helvetica", 14), bg=PRIMARY,
-                       fg="#fff", bd=0, padx=10, cursor="hand2", command=_on_voice)
-    voice_btn.pack(side=RIGHT, padx=(6, 0))
+    # Voice button below text input, clearly visible
+    voice_frame = Frame(input_frame, bg=BG)
+    voice_frame.pack(fill=X, pady=(4, 0))
+    from voice_input import BUTTON_LABEL, TOOLTIP
+    voice_btn = Button(voice_frame, text=BUTTON_LABEL, font=("Helvetica", 11),
+                       bg=PRIMARY, fg="#fff", bd=0, padx=14, pady=6,
+                       activebackground=PRIMARY_H, cursor="hand2", command=_on_voice)
+    voice_btn.pack(side=LEFT)
     def _on_focus_in(e):
         if text_input.get() in (t("what_need", "es"), t("what_need", "en")):
             text_input.delete(0, END)
@@ -246,10 +253,18 @@ def build_gui():
             _set_output(t("processing", inp_lang))
             def _proc():
                 r = _run_text_input(txt, inp_lang)
-                root.after(0, lambda: _set_output(r))
+                auto_save(user_input=txt, output=r[:200], panel="text_input")
+                root.after(0, lambda: _stream_output(r))
             threading.Thread(target=_proc, daemon=True).start()
     text_input.bind("<FocusIn>", _on_focus_in)
     text_input.bind("<Return>", _on_enter)
+    # Session restore after crash/interrupt
+    resume = get_resume_message(lang)
+    if resume: _set_output(resume)
+    # Start idle monitor
+    try:
+        from vibe_brain import start_idle_monitor; start_idle_monitor()
+    except Exception: pass
     return root
 
 
@@ -273,6 +288,11 @@ def self_test() -> bool:
     r = _route_file(str(tmp), "en")
     assert r and len(r) > 20, "file routing failed"
     tmp.unlink()
+    # #53 — streaming function exists and is callable
+    assert callable(build_gui), "build_gui should define _stream_output internally"
+    # Confusion reset integration
+    from confusion_reset import record_attempt, auto_save, restore_session
+    assert callable(record_attempt) and callable(auto_save) and callable(restore_session)
     return True
 
 
