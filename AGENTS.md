@@ -1,5 +1,5 @@
 <!-- OpenClay persistent memory. Never delete this file. -->
-<!-- Last updated: 2026-04-10 12:31:56 -->
+<!-- Last updated: 2026-04-14 11:26:45 -->
 
 ## Machine Profile
 
@@ -9,7 +9,7 @@
 - GPU: {'name': 'Intel Iris Plus Graphics 645', 'vram_mb': 1536, 'has_metal': True, 'has_cuda': False}
 - Tier: medium-low
 - Model: ?
-- Detected: 2026-04-10 12:26:45
+- Detected: 2026-04-14 11:10:52
 
 ## What Works
 
@@ -26,6 +26,11 @@
 - [2026-04-07 17:11:44] generate(clawcode) (tools: gemma4:26b) — The most frequent recurring issue in this Python project is: other  Recent occur
 - [2026-04-07 17:13:00] generate(clawcode) (tools: gemma4:26b) — The most frequent recurring issue in this Python project is: other  Recent occur
 - [2026-04-10 12:31:56] generate(clawcode) (tools: qwen2.5:3b-instruct-q4_K_M) — The most frequent error in this Python project is: other  Recent occurrences:
+- [2026-04-13 16:42:12] generate(clawcode) (tools: qwen2.5:3b-instruct-q4_K_M) — The most frequent error in this Python project is: other  Recent occurrences:
+- [2026-04-14 11:13:49] generate(clawcode) (tools: qwen2.5:3b-instruct-q4_K_M) — The most frequent error in this Python project is: other  Recent occurrences:
+- [2026-04-14 11:19:17] generate(clawcode) (tools: gemma4:26b) — The most frequent recurring issue in this Python project is: blocked  Recent occ
+- [2026-04-14 11:23:54] generate(clawcode) (tools: gemma4:26b) — The most frequent recurring issue in this Python project is: blocked  Recent occ
+- [2026-04-14 11:26:45] generate(clawcode) (tools: gemma4:26b) — The most frequent recurring issue in this Python project is: blocked  Recent occ
 
 ## What Failed
 

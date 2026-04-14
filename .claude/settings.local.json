@@ -111,7 +111,27 @@
       "Bash(python3 biotech_review_agent.py)",
       "Bash(chmod +x build_mac_app.sh build_dmg.sh)",
       "Bash(ls *.py)",
-      "Bash(ls *.md)"
+      "Bash(ls *.md)",
+      "Bash(python3 clay_server.py)",
+      "Bash(curl -s http://localhost:3000/)",
+      "Bash(curl -s -X POST http://localhost:3000/api/ask -H 'Content-Type: application/json' -d '{\"prompt\":\"Hola, dime en una oración qué eres.\"}')",
+      "Bash(lsof -ti:3000)",
+      "Read(//Users/no_ta/Desktop/Open Clay/**)",
+      "Bash(open http://localhost:3000)",
+      "mcp__Claude_Preview__preview_start",
+      "Bash(pip3 cache:*)",
+      "Bash(brew cleanup:*)",
+      "Bash(find \"/Users/no_ta/Desktop/Open Clay\" -name \"__pycache__\" -type d -exec rm -rf {} +)",
+      "Bash(find \"/Users/no_ta/Desktop/Open Clay\" -name \"*.pyc\" -type f -delete)",
+      "Bash(ls -d \"/Users/no_ta/Desktop/Open Clay/\"*env*)",
+      "Bash(osacompile -o OpenClay.app -e ':*)",
+      "Bash(cp openclay.icns OpenClay.app/Contents/Resources/droplet.icns)",
+      "Bash(cp openclay.icns OpenClay.app/Contents/Resources/applet.icns)",
+      "Bash(touch OpenClay.app)",
+      "Bash(cp -R OpenClay.app /Applications/OpenClay.app)",
+      "Bash(open /Applications/)",
+      "Bash(curl -s -X POST http://localhost:3000/api/detect-apps -H \"Content-Type: application/json\" -d '{}')",
+      "Bash(curl -s --max-time 5 -X POST http://localhost:3000/api/detect-apps -H \"Content-Type: application/json\" -d '{}')"
     ]
   }
 }

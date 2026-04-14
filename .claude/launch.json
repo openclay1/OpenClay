@@ -2,6 +2,12 @@
   "version": "0.0.1",
   "configurations": [
     {
+      "name": "Clay Interface",
+      "runtimeExecutable": "python3",
+      "runtimeArgs": ["clay_server.py"],
+      "port": 3000
+    },
+    {
       "name": "OpenClay Full Stack",
       "runtimeExecutable": "python3",
       "runtimeArgs": ["app.py"],
