@@ -22,10 +22,28 @@ _model = None
 # ── Session state ────────────────────────────────────────────────
 loaded_document = ""
 loaded_filename = ""
-conversation_history = []
+conversation_history = []  # [{role, content, timestamp}, ...]
 AGENT_BACKEND = "simple"
 _watcher_threads = {}
 _new_ingested_count = 0
+_connected_folders = []  # user-connected folder paths
+_soul_text = ""  # loaded from soul.md + soul_custom.md
+
+# ── Soul document loading ────────────────────────────────────────
+def _load_soul():
+    global _soul_text
+    parts = []
+    soul_path = BASE_DIR / "soul.md"
+    if soul_path.exists():
+        parts.append(soul_path.read_text("utf-8"))
+    custom_path = BASE_DIR / "soul_custom.md"
+    if custom_path.exists():
+        parts.append(custom_path.read_text("utf-8"))
+    _soul_text = "\n\n".join(parts)
+    # Replace [MODEL_NAME] with actual model
+    model = _detect_model() if _is_ollama_running() else PREFERRED_MODELS[0]
+    _soul_text = _soul_text.replace("[MODEL_NAME]", model)
+    return _soul_text
 
 # ── Ollama management ────────────────────────────────────────────
 def _is_ollama_running():
@@ -67,7 +85,15 @@ def _detect_model():
 SYSTEM_PROMPT = """You are OpenClay, a local AI research assistant running on a COANA Labs device in Puerto Rico. You specialize in pharmaceutical compliance (FDA 21 CFR, EU GMP Annex 1, ICH guidelines), clinical research methodology, and scientific paper analysis. You respond in whatever language the user writes in — Spanish or English. You are precise, cite specific regulatory sections when relevant, and flag ambiguities and logical gaps in documents you analyze. When uncertain, say so clearly and explain what information would resolve the uncertainty."""
 
 def _build_system_prompt():
-    parts = [SYSTEM_PROMPT]
+    parts = []
+    # Soul document first (identity layer)
+    if _soul_text:
+        parts.append(_soul_text)
+    parts.append(SYSTEM_PROMPT)
+    # Connected folders context
+    if _connected_folders:
+        folder_list = ", ".join(_connected_folders)
+        parts.append(f"\n\n## Connected Directories\nThe user has granted access to the following directories: {folder_list}. When they reference a file or ask you to read something, ask which file they mean.")
     prefs = MEMORY_DIR / "preferences.md"
     if prefs.exists():
         parts.append(f"\n\n## User Preferences (learned over time):\n{prefs.read_text('utf-8')[:2000]}")
@@ -297,7 +323,11 @@ class ClayHandler(http.server.SimpleHTTPRequestHandler):
         routes = {"/api/ask": self._handle_ask, "/api/upload": self._handle_upload,
                   "/api/clear-document": self._handle_clear_doc, "/api/set-mode": self._handle_set_mode,
                   "/api/status": self._handle_status, "/api/setup-watchers": self._handle_setup_watchers,
-                  "/api/detect-apps": self._handle_detect_apps, "/api/voice-transcribe": self._handle_voice}
+                  "/api/detect-apps": self._handle_detect_apps, "/api/voice-transcribe": self._handle_voice,
+                  "/api/history": self._handle_history,
+                  "/api/connect-folder": self._handle_connect_folder,
+                  "/api/mesh-status": self._handle_mesh_status,
+                  "/api/mesh-send": self._handle_mesh_send}
         handler = routes.get(self.path)
         if handler: handler()
         else: self.send_error(404)
@@ -327,9 +357,14 @@ class ClayHandler(http.server.SimpleHTTPRequestHandler):
             AGENT_BACKEND = "simple"
             self._send_json({"command": True, "mode": "simple"}); return
 
+        # Track user message
+        now = datetime.now().isoformat()
+        conversation_history.append({"role": "user", "content": prompt, "timestamp": now})
+
         # Agentic mode — non-streaming
         if AGENT_BACKEND == "agentic":
             result = _agentic_loop(prompt, self)
+            conversation_history.append({"role": "assistant", "content": result, "timestamp": datetime.now().isoformat()})
             _generate_wiki_from_response(prompt, result)
             _update_preferences(prompt, result)
             self._send_json({"response": result, "done": True}); return
@@ -359,8 +394,10 @@ class ClayHandler(http.server.SimpleHTTPRequestHandler):
                     chunk = json.loads(line)
                     full_response += chunk.get("response", "")
                 except Exception: pass
-            # Background: wiki + preferences
+            # Track assistant response
             if full_response:
+                conversation_history.append({"role": "assistant", "content": full_response,
+                                              "timestamp": datetime.now().isoformat()})
                 _generate_wiki_from_response(prompt, full_response)
                 _update_preferences(prompt, full_response)
         except urllib.error.URLError as e:
@@ -448,8 +485,59 @@ class ClayHandler(http.server.SimpleHTTPRequestHandler):
 
     def _handle_voice(self):
         # Placeholder — voice processing happens client-side with Web Speech API
-        # This endpoint is reserved for future server-side whisper processing
         self._send_json({"error": "Use client-side voice input"}, 501)
+
+    def _handle_history(self):
+        self._read_body()
+        # Return last 40 messages (20 exchanges)
+        recent = conversation_history[-40:]
+        self._send_json({"history": recent, "total": len(conversation_history)})
+
+    def _handle_connect_folder(self):
+        global _connected_folders
+        body = json.loads(self._read_body())
+        action = body.get("action", "add")
+        folder = body.get("folder", "")
+        if action == "add" and folder and folder not in _connected_folders:
+            _connected_folders.append(folder)
+        elif action == "remove" and folder in _connected_folders:
+            _connected_folders.remove(folder)
+        elif action == "list":
+            pass
+        self._send_json({"ok": True, "connected": _connected_folders})
+
+    def _handle_mesh_status(self):
+        self._read_body()
+        try:
+            req = urllib.request.Request("http://localhost:4403/api/v1/fromradio",
+                                         method="GET")
+            resp = urllib.request.urlopen(req, timeout=2)
+            # Try to get node info
+            try:
+                node_req = urllib.request.Request("http://localhost:4403/hotspot-detect/generate_204",
+                                                   method="GET")
+                urllib.request.urlopen(node_req, timeout=2)
+            except Exception:
+                pass
+            self._send_json({"connected": True, "status": "active"})
+        except Exception:
+            self._send_json({"connected": False, "status": "offline"})
+
+    def _handle_mesh_send(self):
+        body = json.loads(self._read_body())
+        message = body.get("message", "")
+        if not message:
+            self._send_json({"error": "No message"}, 400); return
+        try:
+            # Forward to Meshtastic HTTP API
+            mesh_body = json.dumps({"text": message}).encode()
+            req = urllib.request.Request("http://localhost:4403/api/v1/sendtext",
+                                         data=mesh_body,
+                                         headers={"Content-Type": "application/json"})
+            resp = urllib.request.urlopen(req, timeout=5)
+            self._send_json({"ok": True, "sent": message})
+        except Exception as e:
+            self._send_json({"error": f"Mesh send failed: {e}"}, 502)
 
     def do_OPTIONS(self):
         self.send_response(200)
@@ -479,6 +567,11 @@ def main():
         print(f"ok  (model: {_detect_model()})")
     else:
         print("x  Ollama not available"); sys.exit(1)
+    # Load soul document
+    soul = _load_soul()
+    if soul:
+        custom = (BASE_DIR / "soul_custom.md").exists()
+        print(f"  Soul loaded ({len(soul)} chars" + (" + custom" if custom else "") + ")")
     # Start any saved watchers
     cfg = _load_watcher_config()
     for f in cfg.get("watched_folders", []):

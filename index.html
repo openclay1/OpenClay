@@ -9,9 +9,13 @@
   <style>
     :root {
       --bg: #161310; --surface: #1b1814; --surface-2: #201d19;
-      --border: #373330; --text: #cec8c0; --muted: #7a7468; --faint: #524e48;
-      --primary: #e06438; --primary-hover: #d05025;
-      --accent-soft: rgba(224,100,56,0.10);
+      --border: #373330; --divider: #2a2720; --text: #cec8c0; --muted: #7a7468; --faint: #524e48;
+      --primary: #e06438; --primary-hover: #d05025; --primary-active: #b84020;
+      --primary-highlight: #3d2418; --accent-soft: rgba(224,100,56,0.10);
+      --radius-sm: 0.375rem; --radius-md: 0.5rem; --radius-lg: 0.75rem;
+      --radius-xl: 1rem; --radius-full: 9999px;
+      --shadow-sm: 0 1px 3px rgba(0,0,0,0.25); --shadow-md: 0 4px 16px rgba(0,0,0,0.35);
+      --transition: 180ms cubic-bezier(0.16,1,0.3,1);
     }
     * { margin: 0; padding: 0; box-sizing: border-box; }
     html, body { width: 100%; height: 100%; background: var(--bg);
@@ -29,18 +33,20 @@
       z-index: 10; width: calc(100vw - 24px); max-width: 560px; }
     #input-row { display: flex; gap: 4px; align-items: center; }
     #clay-input { flex: 1; min-width: 0; background: var(--surface); border: 1px solid var(--border);
-      border-radius: 9999px; padding: 10px 14px; font-family: inherit; font-size: 13px;
-      color: var(--text); outline: none; transition: border-color 180ms; }
+      border-radius: var(--radius-full); padding: 10px 14px; font-family: inherit; font-size: 13px;
+      color: var(--text); outline: none; transition: border-color var(--transition); }
     #clay-input::placeholder { color: var(--faint); }
     #clay-input:focus { border-color: var(--primary); box-shadow: 0 0 0 3px var(--accent-soft); }
     .btn-icon { background: var(--surface); border: 1px solid var(--border); border-radius: 50%;
       width: 34px; height: 34px; display: flex; align-items: center; justify-content: center;
-      cursor: pointer; font-size: 14px; transition: all 180ms; flex-shrink: 0; }
+      cursor: pointer; font-size: 14px; transition: all var(--transition); flex-shrink: 0; }
     .btn-icon:hover { border-color: var(--primary); background: var(--accent-soft); }
     .btn-icon.active { background: var(--primary); border-color: var(--primary); }
-    #clay-send { background: var(--primary); color: #fff; border: none; border-radius: 9999px;
+    .btn-icon.recording { background: #c0392b; border-color: #c0392b; animation: pulse-rec 1.2s infinite; }
+    @keyframes pulse-rec { 0%,100% { box-shadow: 0 0 0 0 rgba(192,57,43,0.4); } 50% { box-shadow: 0 0 0 8px rgba(192,57,43,0); } }
+    #clay-send { background: var(--primary); color: #fff; border: none; border-radius: var(--radius-full);
       padding: 10px 14px; font-family: inherit; font-size: 12px; font-weight: 500;
-      cursor: pointer; transition: all 180ms; box-shadow: 0 2px 8px rgba(224,100,56,0.3);
+      cursor: pointer; transition: all var(--transition); box-shadow: 0 2px 8px rgba(224,100,56,0.3);
       white-space: nowrap; flex-shrink: 0; }
     #clay-send:hover { background: var(--primary-hover); transform: translateY(-1px); }
 
@@ -48,7 +54,7 @@
     #badges { display: flex; gap: 8px; flex-wrap: wrap; align-items: center;
       margin-top: 6px; min-height: 20px; }
     .badge { font-size: 0.7rem; color: var(--muted); background: var(--surface);
-      border: 1px solid var(--border); border-radius: 9999px; padding: 3px 10px;
+      border: 1px solid var(--border); border-radius: var(--radius-full); padding: 3px 10px;
       display: flex; align-items: center; gap: 4px; }
     .badge .close { cursor: pointer; opacity: 0.6; }
     .badge .close:hover { opacity: 1; color: var(--primary); }
@@ -60,26 +66,108 @@
 
     /* Settings panel */
     #settings-btn { position: fixed; top: 20px; right: 20px; z-index: 20; }
-    #settings-panel { position: fixed; top: 0; right: -360px; width: 340px; height: 100%;
+    #settings-panel { position: fixed; top: 0; right: -380px; width: 360px; height: 100%;
       background: var(--surface); border-left: 1px solid var(--border); z-index: 30;
-      transition: right 250ms cubic-bezier(0.16,1,0.3,1); padding: 24px; overflow-y: auto; }
+      transition: right 250ms cubic-bezier(0.16,1,0.3,1); overflow-y: auto; }
     #settings-panel.open { right: 0; }
+    .settings-inner { padding: 24px; }
     #settings-panel h2 { font-family: 'Instrument Serif',Georgia,serif; font-style: italic;
-      color: var(--primary); font-size: 1.3rem; margin-bottom: 16px; }
+      color: var(--primary); font-size: 1.3rem; margin-bottom: 12px; }
+    #settings-panel h3 { font-size: 0.8rem; color: var(--muted); text-transform: uppercase;
+      letter-spacing: 0.08em; margin: 20px 0 10px; }
+
+    /* Tab bar in settings */
+    .settings-tabs { display: flex; gap: 0; border-bottom: 1px solid var(--border); margin-bottom: 16px; }
+    .settings-tab { flex: 1; padding: 10px 8px; text-align: center; font-size: 0.75rem; font-weight: 500;
+      color: var(--muted); background: none; border: none; cursor: pointer;
+      border-bottom: 2px solid transparent; transition: all var(--transition); font-family: inherit; }
+    .settings-tab:hover { color: var(--text); }
+    .settings-tab.active { color: var(--primary); border-bottom-color: var(--primary); }
+    .tab-content { display: none; }
+    .tab-content.active { display: block; }
+
+    /* Source items */
     .source-item { display: flex; justify-content: space-between; align-items: center;
-      padding: 10px 0; border-bottom: 1px solid var(--border); }
+      padding: 10px 0; border-bottom: 1px solid var(--divider); }
     .source-item label { font-size: 0.85rem; color: var(--text); }
     .source-item small { font-size: 0.7rem; color: var(--muted); display: block; }
     .toggle { width: 40px; height: 22px; background: var(--border); border-radius: 11px;
-      position: relative; cursor: pointer; transition: background 180ms; border: none; flex-shrink: 0; }
+      position: relative; cursor: pointer; transition: background var(--transition); border: none; flex-shrink: 0; }
     .toggle.on { background: var(--primary); }
     .toggle::after { content: ''; position: absolute; top: 3px; left: 3px; width: 16px; height: 16px;
-      background: #fff; border-radius: 50%; transition: left 180ms; }
+      background: #fff; border-radius: 50%; transition: left var(--transition); }
     .toggle.on::after { left: 21px; }
+
+    /* Folder chips */
+    .folder-chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0; }
+    .folder-chip { display: flex; align-items: center; gap: 4px; background: var(--surface-2);
+      border: 1px solid var(--border); border-radius: var(--radius-full); padding: 4px 10px;
+      font-size: 0.72rem; color: var(--text); }
+    .folder-chip .chip-x { cursor: pointer; color: var(--muted); font-size: 0.8rem; }
+    .folder-chip .chip-x:hover { color: var(--primary); }
+    .folder-shortcut { background: var(--accent-soft); border: 1px solid var(--border);
+      border-radius: var(--radius-full); padding: 6px 14px; font-size: 0.75rem; font-weight: 500;
+      color: var(--text); cursor: pointer; transition: all var(--transition); font-family: inherit; }
+    .folder-shortcut:hover { border-color: var(--primary); background: var(--primary-highlight); }
+
+    /* History */
+    .history-entry { padding: 10px 0; border-bottom: 1px solid var(--divider); }
+    .history-role { font-size: 0.65rem; font-weight: 600; text-transform: uppercase;
+      letter-spacing: 0.06em; margin-bottom: 2px; }
+    .history-role.user { color: var(--primary); }
+    .history-role.assistant { color: var(--muted); }
+    .history-text { font-size: 0.8rem; color: var(--text); line-height: 1.5;
+      max-height: 100px; overflow: hidden; word-break: break-word; }
+    .history-time { font-size: 0.6rem; color: var(--faint); margin-top: 3px; }
+    .history-actions { display: flex; gap: 6px; margin-top: 4px; }
+    .history-dl { font-size: 0.65rem; color: var(--primary); background: none; border: 1px solid var(--primary);
+      border-radius: var(--radius-full); padding: 2px 10px; cursor: pointer; font-family: inherit;
+      transition: all var(--transition); }
+    .history-dl:hover { background: var(--primary); color: #fff; }
+
+    /* Mesh panel */
+    .mesh-status { display: flex; align-items: center; gap: 8px; padding: 8px 0; }
+    .mesh-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+    .mesh-dot.online { background: #27ae60; box-shadow: 0 0 6px rgba(39,174,96,0.4); }
+    .mesh-dot.offline { background: var(--faint); }
+    .mesh-label { font-size: 0.82rem; color: var(--text); }
+    .mesh-hint { font-size: 0.7rem; color: var(--faint); line-height: 1.4; margin-top: 6px; }
+    #mesh-input-row { display: flex; gap: 4px; margin-top: 10px; }
+    #mesh-input { flex: 1; background: var(--bg); border: 1px solid var(--border);
+      border-radius: var(--radius-md); padding: 8px 10px; font-family: inherit; font-size: 0.8rem;
+      color: var(--text); outline: none; }
+    #mesh-input:focus { border-color: var(--primary); }
+    #mesh-send { background: var(--primary); color: #fff; border: none; border-radius: var(--radius-md);
+      padding: 8px 14px; font-family: inherit; font-size: 0.75rem; cursor: pointer; }
+    .mesh-messages { max-height: 150px; overflow-y: auto; margin-top: 8px; }
+    .mesh-msg { font-size: 0.72rem; color: var(--text); padding: 4px 0;
+      border-bottom: 1px solid var(--divider); }
+    .mesh-msg-time { color: var(--faint); }
+
+    /* Settings buttons */
+    .settings-action { width: 100%; padding: 10px 20px; border-radius: var(--radius-full);
+      font-family: inherit; font-size: 0.85rem; cursor: pointer; transition: all var(--transition); }
+    .settings-action.primary { background: var(--primary); color: #fff; border: none;
+      box-shadow: 0 2px 8px rgba(224,100,56,0.3); }
+    .settings-action.primary:hover { background: var(--primary-hover); }
+    .settings-action.secondary { background: none; color: var(--muted); border: 1px solid var(--border); }
+    .settings-action.secondary:hover { border-color: var(--primary); color: var(--text); }
+
+    /* Overlay for settings */
+    #settings-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+      background: rgba(0,0,0,0.4); z-index: 25; opacity: 0; pointer-events: none;
+      transition: opacity 250ms; }
+    #settings-overlay.visible { opacity: 1; pointer-events: auto; }
 
     ::selection { background: rgba(224,100,56,0.2); }
     :focus-visible { outline: 2px solid var(--primary); outline-offset: 3px; }
-    @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+    @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+
+    /* Scrollbar */
+    ::-webkit-scrollbar { width: 6px; }
+    ::-webkit-scrollbar-track { background: var(--bg); }
+    ::-webkit-scrollbar-thumb { background: var(--surface-2); border-radius: 3px; }
+    ::-webkit-scrollbar-thumb:hover { background: var(--border); }
   </style>
 </head>
 <body>
@@ -91,17 +179,59 @@
 
   <button class="btn-icon" id="settings-btn" onclick="toggleSettings()">&#9881;</button>
 
+  <div id="settings-overlay" onclick="toggleSettings()"></div>
+
   <div id="settings-panel">
-    <h2>Fuentes conectadas</h2>
-    <div id="sources-list">Detecting...</div>
-    <br>
-    <button onclick="saveWatchers()" style="background:var(--primary);color:#fff;border:none;
-      border-radius:9999px;padding:10px 20px;cursor:pointer;font-family:inherit;width:100%;">
-      Guardar / Save</button>
-    <br><br>
-    <button onclick="toggleSettings()" style="background:none;color:var(--muted);border:1px solid var(--border);
-      border-radius:9999px;padding:8px 16px;cursor:pointer;font-family:inherit;width:100%;">
-      Cerrar</button>
+    <div class="settings-inner">
+      <h2>OpenClay</h2>
+      <div class="settings-tabs">
+        <button class="settings-tab active" onclick="switchTab('sources')">Fuentes</button>
+        <button class="settings-tab" onclick="switchTab('history')">Historial</button>
+        <button class="settings-tab" onclick="switchTab('mesh')">Red Local</button>
+      </div>
+
+      <!-- Sources tab -->
+      <div id="tab-sources" class="tab-content active">
+        <h3>Carpetas conectadas</h3>
+        <div id="connected-chips" class="folder-chips"></div>
+        <div style="display:flex; gap:6px; flex-wrap:wrap; margin:10px 0;">
+          <button class="folder-shortcut" onclick="connectPreset('desktop')">+ Desktop</button>
+          <button class="folder-shortcut" onclick="connectPreset('docs')">+ Docs</button>
+          <button class="folder-shortcut" onclick="pickFolder()">+ Elegir carpeta...</button>
+        </div>
+
+        <h3>Auto-ingesta</h3>
+        <div id="sources-list">Detecting...</div>
+        <br>
+        <button onclick="saveWatchers()" class="settings-action primary">Guardar / Save</button>
+      </div>
+
+      <!-- History tab -->
+      <div id="tab-history" class="tab-content">
+        <h3>Conversaciones recientes</h3>
+        <div id="history-list" style="max-height: calc(100vh - 200px); overflow-y: auto;"></div>
+      </div>
+
+      <!-- Mesh tab -->
+      <div id="tab-mesh" class="tab-content">
+        <h3>Red Local / Local Network</h3>
+        <div class="mesh-status">
+          <span id="mesh-dot" class="mesh-dot offline"></span>
+          <span id="mesh-label" class="mesh-label">Verificando...</span>
+        </div>
+        <p id="mesh-hint" class="mesh-hint">Conecta un dispositivo Meshtastic para activar la red local.</p>
+        <div id="mesh-controls" style="display:none;">
+          <div id="mesh-input-row">
+            <input type="text" id="mesh-input" placeholder="Mensaje para la red..." maxlength="200">
+            <button id="mesh-send" onclick="sendMeshMessage()">Enviar</button>
+          </div>
+          <div id="mesh-messages" class="mesh-messages"></div>
+        </div>
+      </div>
+
+      <br>
+      <button onclick="toggleSettings()" class="settings-action secondary">Cerrar</button>
+    </div>
   </div>
 
   <div id="canvas-container"></div>
@@ -117,7 +247,7 @@
       <button class="btn-icon" id="clip-btn" onclick="openFilePicker()" title="Upload PDF/TXT">&#128206;</button>
       <input type="text" id="clay-input" placeholder="Pregunta algo... / Ask anything..." autocomplete="off">
       <button id="clay-send" onclick="handleSend()">Enviar</button>
-      <button class="btn-icon" id="sound-btn" onclick="toggleSound()" title="Toggle voice output">&#128266;</button>
+      <button class="btn-icon" id="sound-btn" onclick="toggleMute()" title="Mute / Stop">&#128266;</button>
     </div>
     <div id="badges"></div>
     <input type="file" id="file-picker" accept=".pdf,.txt,.md" style="display:none" onchange="handleFileUpload(event)">
@@ -127,20 +257,161 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.4/p5.min.js"></script>
 
   <script>
-    // ── State ──
+    // ══════════════════════════════════════════════════════════════
+    //  Unified App State
+    // ══════════════════════════════════════════════════════════════
+    let appState = 'idle'; // idle | listening | thinking | speaking | muted
     let voiceOutputEnabled = true;
-    let isRecording = false;
-    let mediaRecorder = null;
     let settingsOpen = false;
     let detectedApps = {};
     let watcherSelections = {};
+    let connectedFolders = [];
+    let meshConnected = false;
+    let meshMessages = [];
+    let localHistory = []; // client-side mirror
+
+    // ── Module-scope SpeechRecognition ──
+    const SpeechRecognitionAPI = window.SpeechRecognition || window.webkitSpeechRecognition;
+    let recognition = null;
+    if (SpeechRecognitionAPI) {
+      recognition = new SpeechRecognitionAPI();
+      recognition.lang = 'es-PR';
+      recognition.continuous = false;
+      recognition.interimResults = false;
+      recognition.maxAlternatives = 1;
+
+      recognition.onresult = (event) => {
+        const text = event.results[0][0].transcript;
+        document.getElementById('clay-input').value = text;
+        setAppState('idle');
+        showBadge('voice', 'Procesando...', false);
+        setTimeout(() => removeBadge('voice'), 1500);
+      };
+
+      recognition.onerror = (event) => {
+        const msgs = {
+          'no-speech': 'No escuch\u00E9 nada \u2014 intenta de nuevo',
+          'audio-capture': 'No se encontr\u00F3 micr\u00F3fono',
+          'not-allowed': 'Permiso de micr\u00F3fono denegado',
+          'aborted': '',
+        };
+        const msg = msgs[event.error] || 'Error de voz: ' + event.error;
+        if (msg) {
+          showBadge('voice', '\u26A0 ' + msg, true);
+          setTimeout(() => removeBadge('voice'), 3000);
+        }
+        setAppState('idle');
+      };
+
+      recognition.onend = () => {
+        if (appState === 'listening') setAppState('idle');
+      };
+    }
+
+    function setAppState(newState) {
+      appState = newState;
+      const micBtn = document.getElementById('mic-btn');
+      const soundBtn = document.getElementById('sound-btn');
+
+      // Mic button visual
+      micBtn.classList.remove('active', 'recording');
+      if (newState === 'listening') micBtn.classList.add('recording');
+
+      // Sound button visual
+      soundBtn.classList.remove('active');
+      if (newState === 'muted' || !voiceOutputEnabled) soundBtn.classList.add('active');
+
+      // Bridge to p5.js sketch
+      if (typeof setClayState === 'function') setClayState(newState);
+    }
 
     // ── Input handling ──
     document.getElementById('clay-input').addEventListener('keydown', (e) => {
       if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); }
     });
 
-    // ── File upload ──
+    // ══════════════════════════════════════════════════════════════
+    //  Voice Input — Mic Button
+    // ══════════════════════════════════════════════════════════════
+    function toggleMic() {
+      if (!recognition) {
+        showBadge('voice', '\u26A0 Voice not supported in this browser', true);
+        return;
+      }
+      if (appState === 'listening') {
+        // Stop listening
+        recognition.stop();
+        setAppState('idle');
+        return;
+      }
+      // If speaking, stop speech first
+      if (appState === 'speaking') {
+        window.speechSynthesis.cancel();
+      }
+
+      setAppState('listening');
+      showBadge('voice', '\uD83D\uDD34 Escuchando...', false);
+      try {
+        recognition.start();
+      } catch (e) {
+        // Already started — abort and retry
+        recognition.abort();
+        setTimeout(() => {
+          try { recognition.start(); } catch(e2) {
+            setAppState('idle');
+            showBadge('voice', '\u26A0 Error iniciando micr\u00F3fono', true);
+          }
+        }, 100);
+      }
+    }
+
+    // ══════════════════════════════════════════════════════════════
+    //  Mute Button — Universal Stop
+    // ══════════════════════════════════════════════════════════════
+    function toggleMute() {
+      if (appState === 'listening') {
+        // Stop listening
+        if (recognition) { recognition.stop(); recognition.abort(); }
+        removeBadge('voice');
+        setAppState('muted');
+        setTimeout(() => { if (appState === 'muted') setAppState('idle'); }, 1500);
+        return;
+      }
+      if (appState === 'speaking') {
+        // Stop speaking
+        window.speechSynthesis.cancel();
+        setAppState('muted');
+        setTimeout(() => { if (appState === 'muted') setAppState('idle'); }, 1500);
+        return;
+      }
+      // Toggle voice output preference
+      voiceOutputEnabled = !voiceOutputEnabled;
+      const btn = document.getElementById('sound-btn');
+      btn.innerHTML = voiceOutputEnabled ? '\uD83D\uDD0A' : '\uD83D\uDD07';
+      btn.classList.toggle('active', !voiceOutputEnabled);
+      showBadge('voice', voiceOutputEnabled ? 'Voz activada' : 'Voz desactivada', false);
+      setTimeout(() => removeBadge('voice'), 1500);
+    }
+
+    // ══════════════════════════════════════════════════════════════
+    //  Voice Output — Speech Synthesis
+    // ══════════════════════════════════════════════════════════════
+    function speakText(text) {
+      if (!voiceOutputEnabled || !('speechSynthesis' in window)) return;
+      window.speechSynthesis.cancel();
+      const utterance = new SpeechSynthesisUtterance(text.substring(0, 2000));
+      const spanishWords = (text.match(/\b(de|el|la|los|las|en|que|por|con|para|una|del)\b/gi) || []).length;
+      utterance.lang = spanishWords > 3 ? 'es-PR' : 'en-US';
+      utterance.rate = 0.95;
+      utterance.pitch = 1.0;
+      utterance.onstart = () => setAppState('speaking');
+      utterance.onend = () => { if (appState === 'speaking') setAppState('idle'); };
+      window.speechSynthesis.speak(utterance);
+    }
+
+    // ══════════════════════════════════════════════════════════════
+    //  File Upload
+    // ══════════════════════════════════════════════════════════════
     function openFilePicker() { document.getElementById('file-picker').click(); }
 
     async function handleFileUpload(event) {
@@ -152,7 +423,7 @@
         const resp = await fetch('/api/upload', { method: 'POST', body: formData });
         const data = await resp.json();
         if (data.ok) {
-          showBadge('doc', '\u{1F4C4} ' + file.name + ' cargado');
+          showBadge('doc', '\uD83D\uDCC4 ' + file.name + ' cargado');
           if (typeof triggerPulse === 'function') triggerPulse();
         } else {
           showBadge('doc', '\u26A0 ' + (data.error || 'Upload failed'));
@@ -166,7 +437,9 @@
       removeBadge('doc');
     }
 
-    // ── Badges ──
+    // ══════════════════════════════════════════════════════════════
+    //  Badges
+    // ══════════════════════════════════════════════════════════════
     function showBadge(id, text, closable=true) {
       removeBadge(id);
       const badges = document.getElementById('badges');
@@ -174,7 +447,7 @@
       badge.className = 'badge';
       badge.id = 'badge-' + id;
       badge.innerHTML = text + (closable ?
-        ' <span class="close" onclick="' + (id==='doc' ? 'clearDocument()' : 'removeBadge(\''+id+'\')') + '">\u2715</span>' : '');
+        ' <span class="close" onclick="' + (id==='doc' ? 'clearDocument()' : "removeBadge('"+id+"')") + '">\u2715</span>' : '');
       badges.appendChild(badge);
     }
 
@@ -183,75 +456,31 @@
       if (el) el.remove();
     }
 
-    // ── Voice input (Web Speech API) ──
-    function toggleMic() {
-      if (!('webkitSpeechRecognition' in window || 'SpeechRecognition' in window)) {
-        showBadge('voice', 'Voice not supported in this browser', true);
-        return;
-      }
-      const btn = document.getElementById('mic-btn');
-      if (isRecording) {
-        isRecording = false;
-        btn.classList.remove('active');
-        if (window._recognition) window._recognition.stop();
-        return;
-      }
-      isRecording = true;
-      btn.classList.add('active');
-      if (typeof setRecordingState === 'function') setRecordingState(true);
-
-      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-      const recognition = new SpeechRecognition();
-      recognition.lang = 'es-PR';
-      recognition.interimResults = false;
-      recognition.maxAlternatives = 1;
-      recognition.continuous = false;
-      window._recognition = recognition;
-
-      recognition.onresult = (event) => {
-        const text = event.results[0][0].transcript;
-        document.getElementById('clay-input').value = text;
-        // Never auto-submit
-      };
-      recognition.onerror = (event) => {
-        showBadge('voice', 'No entend\u00ED \u2014 intenta de nuevo', true);
-        setTimeout(() => removeBadge('voice'), 2000);
-      };
-      recognition.onend = () => {
-        isRecording = false;
-        btn.classList.remove('active');
-        if (typeof setRecordingState === 'function') setRecordingState(false);
-      };
-      recognition.start();
-    }
-
-    // ── Voice output (Web Speech Synthesis) ──
-    function toggleSound() {
-      voiceOutputEnabled = !voiceOutputEnabled;
-      const btn = document.getElementById('sound-btn');
-      btn.innerHTML = voiceOutputEnabled ? '\u{1F50A}' : '\u{1F507}';
-      btn.classList.toggle('active', !voiceOutputEnabled);
-    }
-
-    function speakText(text) {
-      if (!voiceOutputEnabled || !('speechSynthesis' in window)) return;
-      window.speechSynthesis.cancel();
-      const utterance = new SpeechSynthesisUtterance(text.substring(0, 2000));
-      // Detect language
-      const spanishWords = (text.match(/\b(de|el|la|los|las|en|que|por|con|para|una|del)\b/gi) || []).length;
-      utterance.lang = spanishWords > 3 ? 'es-PR' : 'en-US';
-      utterance.rate = 0.95;
-      utterance.pitch = 1.0;
-      window.speechSynthesis.speak(utterance);
-    }
-
-    // ── Settings panel ──
+    // ══════════════════════════════════════════════════════════════
+    //  Settings Panel with Tabs
+    // ══════════════════════════════════════════════════════════════
     function toggleSettings() {
       settingsOpen = !settingsOpen;
       document.getElementById('settings-panel').classList.toggle('open', settingsOpen);
-      if (settingsOpen) detectApps();
+      document.getElementById('settings-overlay').classList.toggle('visible', settingsOpen);
+      if (settingsOpen) {
+        detectApps();
+        loadHistory();
+        checkMeshStatus();
+        renderConnectedFolders();
+      }
     }
 
+    function switchTab(name) {
+      document.querySelectorAll('.settings-tab').forEach(t => t.classList.remove('active'));
+      document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+      document.querySelector(`[onclick="switchTab('${name}')"]`).classList.add('active');
+      document.getElementById('tab-' + name).classList.add('active');
+    }
+
+    // ══════════════════════════════════════════════════════════════
+    //  Sources / Watchers
+    // ══════════════════════════════════════════════════════════════
     async function detectApps() {
       try {
         const resp = await fetch('/api/detect-apps', { method: 'POST',
@@ -290,12 +519,209 @@
           headers: {'Content-Type': 'application/json'},
           body: JSON.stringify({ folders }) });
         const data = await resp.json();
-        showBadge('watchers', '\u{1F441} Watching ' + (data.watching?.length || 0) + ' folders', true);
+        showBadge('watchers', '\uD83D\uDC41 Watching ' + (data.watching?.length || 0) + ' folders', true);
         toggleSettings();
       } catch (e) {}
     }
 
-    // ── Status polling ──
+    // ══════════════════════════════════════════════════════════════
+    //  Folder Connection (File System Access API)
+    // ══════════════════════════════════════════════════════════════
+    async function pickFolder() {
+      if (!('showDirectoryPicker' in window)) {
+        showBadge('folder', '\u26A0 Tu navegador no soporta esta funci\u00F3n', true);
+        return;
+      }
+      try {
+        const dirHandle = await window.showDirectoryPicker();
+        const name = dirHandle.name;
+        if (!connectedFolders.find(f => f.name === name)) {
+          connectedFolders.push({ name, handle: dirHandle });
+          await fetch('/api/connect-folder', { method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ action: 'add', folder: name }) });
+          renderConnectedFolders();
+        }
+      } catch (e) {
+        // User cancelled — no error
+      }
+    }
+
+    function connectPreset(type) {
+      const presets = {
+        desktop: { name: 'Desktop', path: '~/Desktop' },
+        docs: { name: 'Documentos', path: '~/Documents' }
+      };
+      const p = presets[type];
+      if (!p) return;
+      if (!connectedFolders.find(f => f.name === p.name)) {
+        connectedFolders.push({ name: p.name, path: p.path });
+        fetch('/api/connect-folder', { method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({ action: 'add', folder: p.path }) });
+        renderConnectedFolders();
+        showBadge('folder', '\uD83D\uDCC1 ' + p.name + ' conectado', true);
+      }
+    }
+
+    function disconnectFolder(name) {
+      connectedFolders = connectedFolders.filter(f => f.name !== name);
+      fetch('/api/connect-folder', { method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ action: 'remove', folder: name }) });
+      renderConnectedFolders();
+    }
+
+    function renderConnectedFolders() {
+      const el = document.getElementById('connected-chips');
+      if (!el) return;
+      el.innerHTML = '';
+      if (connectedFolders.length === 0) {
+        el.innerHTML = '<span style="font-size:0.72rem;color:var(--faint)">Ninguna carpeta conectada</span>';
+        return;
+      }
+      connectedFolders.forEach(f => {
+        const chip = document.createElement('span');
+        chip.className = 'folder-chip';
+        chip.innerHTML = '\uD83D\uDCC1 ' + f.name +
+          ' <span class="chip-x" onclick="disconnectFolder(\'' + f.name + '\')">\u2715</span>';
+        el.appendChild(chip);
+      });
+    }
+
+    // ══════════════════════════════════════════════════════════════
+    //  Conversation History
+    // ══════════════════════════════════════════════════════════════
+    function addToHistory(role, content) {
+      localHistory.push({ role, content, timestamp: new Date() });
+      if (localHistory.length > 40) localHistory = localHistory.slice(-40);
+    }
+
+    async function loadHistory() {
+      try {
+        const resp = await fetch('/api/history', { method: 'POST',
+          headers: {'Content-Type': 'application/json'}, body: '{}' });
+        const data = await resp.json();
+        if (data.history) localHistory = data.history.map(h => ({
+          ...h, timestamp: new Date(h.timestamp)
+        }));
+        renderHistory();
+      } catch (e) { renderHistory(); }
+    }
+
+    function renderHistory() {
+      const container = document.getElementById('history-list');
+      if (!container) return;
+      container.innerHTML = '';
+      if (localHistory.length === 0) {
+        container.innerHTML = '<p style="font-size:0.8rem;color:var(--faint);padding:20px 0;text-align:center;">Sin conversaciones a\u00FAn</p>';
+        return;
+      }
+      // Show newest first
+      const recent = [...localHistory].reverse().slice(0, 40);
+      recent.forEach(entry => {
+        const div = document.createElement('div');
+        div.className = 'history-entry';
+        const time = entry.timestamp instanceof Date
+          ? entry.timestamp.toLocaleTimeString('es-PR', { hour: '2-digit', minute: '2-digit' })
+          : new Date(entry.timestamp).toLocaleTimeString('es-PR', { hour: '2-digit', minute: '2-digit' });
+        const preview = (entry.content || '').substring(0, 200);
+        const isLong = entry.role === 'assistant' && entry.content && entry.content.length > 500;
+        const hasParagraphs = isLong && (entry.content.split('\n').length > 3 || entry.content.includes('- '));
+        div.innerHTML = '<div class="history-role ' + entry.role + '">' +
+          (entry.role === 'user' ? 'T\u00FA' : 'OpenClay') + '</div>' +
+          '<div class="history-text">' + escapeHtml(preview) + (entry.content.length > 200 ? '...' : '') + '</div>' +
+          '<div class="history-time">' + time + '</div>' +
+          (hasParagraphs ? '<div class="history-actions"><button class="history-dl" onclick="downloadResponse(' +
+            localHistory.indexOf(entry) + ')">Descargar</button></div>' : '');
+        container.appendChild(div);
+      });
+    }
+
+    function downloadResponse(index) {
+      const entry = localHistory[index] || [...localHistory].reverse()[0];
+      if (!entry) return;
+      const blob = new Blob([entry.content], { type: 'text/markdown' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'openclay-response-' + new Date().toISOString().slice(0,10) + '.md';
+      a.click();
+      URL.revokeObjectURL(url);
+    }
+
+    function escapeHtml(text) {
+      const div = document.createElement('div');
+      div.textContent = text;
+      return div.innerHTML;
+    }
+
+    // ══════════════════════════════════════════════════════════════
+    //  Meshtastic / LoRa Mesh Network
+    // ══════════════════════════════════════════════════════════════
+    async function checkMeshStatus() {
+      try {
+        const resp = await fetch('/api/mesh-status', { method: 'POST',
+          headers: {'Content-Type': 'application/json'}, body: '{}' });
+        const data = await resp.json();
+        meshConnected = data.connected;
+        const dot = document.getElementById('mesh-dot');
+        const label = document.getElementById('mesh-label');
+        const hint = document.getElementById('mesh-hint');
+        const controls = document.getElementById('mesh-controls');
+        if (meshConnected) {
+          dot.className = 'mesh-dot online';
+          label.textContent = 'Red activa / Mesh active';
+          hint.style.display = 'none';
+          controls.style.display = 'block';
+          showBadge('mesh', '\uD83D\uDCE1 Mesh activa', false);
+        } else {
+          dot.className = 'mesh-dot offline';
+          label.textContent = 'Sin red local';
+          hint.style.display = 'block';
+          controls.style.display = 'none';
+          removeBadge('mesh');
+        }
+      } catch (e) {
+        document.getElementById('mesh-label').textContent = 'Error verificando red';
+      }
+    }
+
+    async function sendMeshMessage() {
+      const input = document.getElementById('mesh-input');
+      const msg = input.value.trim();
+      if (!msg) return;
+      try {
+        const resp = await fetch('/api/mesh-send', { method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({ message: msg }) });
+        const data = await resp.json();
+        if (data.ok) {
+          meshMessages.push({ text: msg, time: new Date(), sent: true });
+          input.value = '';
+          renderMeshMessages();
+        }
+      } catch (e) {}
+    }
+
+    function renderMeshMessages() {
+      const container = document.getElementById('mesh-messages');
+      if (!container) return;
+      container.innerHTML = '';
+      meshMessages.slice(-10).forEach(m => {
+        const div = document.createElement('div');
+        div.className = 'mesh-msg';
+        const time = m.time.toLocaleTimeString('es-PR', { hour: '2-digit', minute: '2-digit' });
+        div.innerHTML = '<span class="mesh-msg-time">[' + time + ']</span> ' +
+          (m.sent ? '\u2191 ' : '\u2193 ') + escapeHtml(m.text);
+        container.appendChild(div);
+      });
+      container.scrollTop = container.scrollHeight;
+    }
+
+    // ══════════════════════════════════════════════════════════════
+    //  Status Polling
+    // ══════════════════════════════════════════════════════════════
     async function updateStatus() {
       try {
         const resp = await fetch('/api/status', { method: 'POST',
@@ -303,7 +729,7 @@
         const data = await resp.json();
         const memEl = document.getElementById('memory-status');
         let parts = [];
-        if (data.wiki_pages > 0) parts.push('\u{1F4AD} wiki: ' + data.wiki_pages + ' p\u00E1ginas');
+        if (data.wiki_pages > 0) parts.push('\uD83D\uDCAD wiki: ' + data.wiki_pages + ' p\u00E1ginas');
         if (data.preferences_active) parts.push('preferencias activas');
         parts.push('modo ' + (data.mode === 'agentic' ? 'agente' : 'simple'));
         memEl.textContent = parts.join(' \u00B7 ');
@@ -316,6 +742,11 @@
     }
     updateStatus();
     setInterval(updateStatus, 15000);
+
+    // Check mesh every 30s
+    setInterval(() => { if (!settingsOpen) checkMeshStatus(); }, 30000);
+    // Initial mesh check
+    setTimeout(checkMeshStatus, 2000);
   </script>
 </body>
 </html>

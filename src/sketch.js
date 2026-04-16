@@ -5,7 +5,7 @@
 let clayPoints = [];
 let numPoints = 120;
 let baseRadius;
-let state = "idle"; // idle | listening | thinking | speaking | recording
+let state = "idle"; // idle | listening | thinking | speaking | recording | muted
 let inputText = "";
 let responseText = "";
 let displayedText = "";
@@ -16,6 +16,9 @@ let particles = [];
 let cursorBlink = 0;
 let hintOpacity = 255;
 let filePulse = 0;
+let canvasStatus = ""; // "Escuchando..." | "Procesando..." | ""
+let canvasStatusAlpha = 0;
+let meshActive = false;
 
 // Smooth animation
 let targetCY, currentCY, targetRadius, currentRadius;
@@ -26,7 +29,8 @@ const BG = [22, 19, 16];
 const SURFACE = [27, 24, 20];
 const CLAY_BASE = [224, 100, 56];
 const TEXT_CLR = [206, 200, 192];
-const MUTED = [122, 116, 104];
+const MUTED_CLR = [122, 116, 104];
+const MESH_GREEN = [39, 174, 96];
 
 function setup() {
   let canvas = createCanvas(windowWidth, windowHeight);
@@ -43,6 +47,27 @@ function setup() {
   baseRadius = 0;
 }
 
+// Called from HTML — bridges unified appState
+function setClayState(newState) {
+  if (newState === 'listening') {
+    state = "recording";
+    canvasStatus = "Escuchando...";
+    canvasStatusAlpha = 255;
+  } else if (newState === 'muted') {
+    state = "muted";
+    canvasStatus = "";
+  } else if (newState === 'thinking') {
+    state = "thinking";
+    canvasStatus = "";
+  } else if (newState === 'speaking') {
+    state = "speaking";
+    canvasStatus = "";
+  } else {
+    state = "idle";
+    canvasStatus = "";
+  }
+}
+
 // Called from HTML
 function handleSend() {
   let input = document.getElementById('clay-input');
@@ -54,12 +79,21 @@ function handleSend() {
   state = "thinking";
   thinkingStart = millis();
   responseText = ""; displayedText = ""; charIndex = 0;
+  canvasStatus = "";
   for (let i = 0; i < 15; i++) particles.push(makeParticle(width/2, currentCY || height*0.35));
+
+  // Track user message in history
+  if (typeof addToHistory === 'function') addToHistory('user', text);
+
   askOllama(inputText);
 }
 
 function triggerPulse() { filePulse = 1.0; }
-function setRecordingState(recording) { state = recording ? "recording" : "idle"; }
+
+// Legacy bridge — still called if setClayState isn't available
+function setRecordingState(recording) {
+  state = recording ? "recording" : "idle";
+}
 
 async function askOllama(prompt) {
   try {
@@ -75,13 +109,13 @@ async function askOllama(prompt) {
     if (contentType.includes("application/json")) {
       const data = await resp.json();
       if (data.command) {
-        // Mode switch command
         responseText = "Modo cambiado a: " + data.mode;
         state = "speaking"; return;
       }
       if (data.response) {
         responseText = data.response;
         state = "speaking";
+        if (typeof addToHistory === 'function') addToHistory('assistant', data.response);
         if (typeof speakText === 'function') speakText(responseText);
         return;
       }
@@ -104,6 +138,7 @@ async function askOllama(prompt) {
       }
     }
     if (state !== "speaking") state = "speaking";
+    if (typeof addToHistory === 'function') addToHistory('assistant', fullText);
     if (typeof speakText === 'function') speakText(fullText);
   } catch (err) {
     responseText = "No pude conectar con el modelo local.\nVerifica que Ollama este corriendo.";
@@ -129,6 +164,9 @@ function draw() {
     targetRadius = fullR; targetCY = height * 0.32;
   } else if (state === "recording") {
     targetRadius = fullR * 1.05; targetCY = height * 0.35;
+  } else if (state === "muted") {
+    // Muted: contract slightly
+    targetRadius = fullR * 0.85; targetCY = height * 0.35;
   } else {
     targetRadius = fullR; targetCY = height * 0.35;
   }
@@ -149,8 +187,19 @@ function draw() {
   else if (state === "recording") drawRecordingState(cx, cy);
   else if (state === "thinking") drawThinkingState(cx, cy);
   else if (state === "speaking") drawSpeakingState(cx, cy);
+  else if (state === "muted") drawMutedState(cx, cy);
 
-  if (inputText && state !== "idle" && state !== "recording") drawQuestionEcho(cx);
+  if (inputText && state !== "idle" && state !== "recording" && state !== "muted") drawQuestionEcho(cx);
+
+  // Canvas status text (Escuchando... / Procesando...)
+  if (canvasStatusAlpha > 0 && canvasStatus) {
+    drawCanvasStatus(cx, cy);
+  }
+  if (!canvasStatus && canvasStatusAlpha > 0) canvasStatusAlpha = max(0, canvasStatusAlpha - 5);
+
+  // Mesh indicator
+  if (meshActive) drawMeshIndicator();
+
   cursorBlink += 0.05;
 }
 
@@ -158,11 +207,13 @@ function drawGlow(cx, cy) {
   noStroke();
   let pulseSize = state === "thinking" ? baseRadius * 2.5 + sin(breathPhase*3)*30
     : state === "recording" ? baseRadius * 2.8 + sin(breathPhase*1.5)*20
+    : state === "muted" ? baseRadius * 1.8
     : baseRadius * 2.2 + sin(breathPhase)*10;
   for (let i = 5; i > 0; i--) {
     let a = map(i, 5, 0, 3, 15);
     if (state === "thinking") a *= 1.8;
     if (state === "recording") { fill(200, 50, 50, a * 1.5); }
+    else if (state === "muted") { fill(MUTED_CLR[0], MUTED_CLR[1], MUTED_CLR[2], a * 0.6); }
     else { fill(CLAY_BASE[0], CLAY_BASE[1], CLAY_BASE[2], a); }
     ellipse(cx, cy, pulseSize * (i/5) * 2);
   }
@@ -179,6 +230,9 @@ function drawClay(cx, cy) {
       targetR += sin(p.angle*2 + breathPhase*2) * baseRadius * 0.06 + nv * baseRadius * 0.08;
     } else if (state === "recording") {
       targetR += sin(breathPhase*1.5 + p.angle*4) * baseRadius * 0.1 + nv * baseRadius * 0.1;
+    } else if (state === "muted") {
+      // Muted: very subtle, calm deformation
+      targetR += nv * baseRadius * 0.03;
     } else {
       targetR += sin(breathPhase + p.angle*2) * baseRadius * 0.04 + nv * baseRadius * 0.06;
     }
@@ -186,7 +240,14 @@ function drawClay(cx, cy) {
     p.noiseOff += 0.003;
   }
   noStroke();
-  if (state === "recording") { fill(200, 70, 50); } else { fill(CLAY_BASE[0], CLAY_BASE[1], CLAY_BASE[2]); }
+  if (state === "recording") {
+    fill(200, 70, 50);
+  } else if (state === "muted") {
+    // Desaturated clay — shift hue toward brown/gray
+    fill(160, 90, 65);
+  } else {
+    fill(CLAY_BASE[0], CLAY_BASE[1], CLAY_BASE[2]);
+  }
   beginShape();
   for (let i = 0; i <= numPoints; i++) {
     let p = clayPoints[i % numPoints];
@@ -197,7 +258,8 @@ function drawClay(cx, cy) {
   curveVertex(cx + cos(p1.angle)*p1.r, cy + sin(p1.angle)*p1.r);
   endShape();
   // Inner highlight
-  fill(CLAY_BASE[0]+20, CLAY_BASE[1]+15, CLAY_BASE[2]+10, 80);
+  let hl = state === "muted" ? [140, 100, 80, 50] : [CLAY_BASE[0]+20, CLAY_BASE[1]+15, CLAY_BASE[2]+10, 80];
+  fill(hl[0], hl[1], hl[2], hl[3]);
   beginShape();
   for (let i = 0; i <= numPoints; i++) {
     let p = clayPoints[i % numPoints];
@@ -210,7 +272,7 @@ function drawClay(cx, cy) {
 
 function drawIdleState(cx, cy) {
   if (hintOpacity > 0) {
-    fill(MUTED[0], MUTED[1], MUTED[2], hintOpacity);
+    fill(MUTED_CLR[0], MUTED_CLR[1], MUTED_CLR[2], hintOpacity);
     noStroke(); textAlign(CENTER, CENTER); textSize(13);
     text("todo es local  /  everything is local", cx, cy + baseRadius + 40);
     hintOpacity = max(0, hintOpacity - 0.3);
@@ -220,7 +282,20 @@ function drawIdleState(cx, cy) {
 function drawRecordingState(cx, cy) {
   fill(200, 70, 50, 180 + sin(breathPhase*3)*75);
   noStroke(); textAlign(CENTER, CENTER); textSize(14);
-  text("\u{1F534} escuchando... / listening...", cx, cy + baseRadius + 40);
+  text("\uD83D\uDD34 Escuchando... / Listening...", cx, cy + baseRadius + 40);
+}
+
+function drawMutedState(cx, cy) {
+  fill(MUTED_CLR[0], MUTED_CLR[1], MUTED_CLR[2], 120);
+  noStroke(); textAlign(CENTER, CENTER); textSize(12);
+  text("\uD83D\uDD07 silenciado", cx, cy + baseRadius + 40);
+}
+
+function drawCanvasStatus(cx, cy) {
+  canvasStatusAlpha = min(255, canvasStatusAlpha + 10);
+  fill(CLAY_BASE[0], CLAY_BASE[1], CLAY_BASE[2], canvasStatusAlpha * 0.8);
+  noStroke(); textAlign(CENTER, CENTER); textSize(12);
+  text(canvasStatus, cx, cy + baseRadius + 60);
 }
 
 function drawThinkingState(cx, cy) {
@@ -231,7 +306,7 @@ function drawThinkingState(cx, cy) {
     fill(CLAY_BASE[0], CLAY_BASE[1], CLAY_BASE[2], map(sin(breathPhase*4+i*2),-1,1,100,255));
     noStroke(); ellipse(cx + cos(dotAngle)*dotR, cy + sin(dotAngle)*dotR, 7);
   }
-  fill(MUTED[0], MUTED[1], MUTED[2], 180);
+  fill(MUTED_CLR[0], MUTED_CLR[1], MUTED_CLR[2], 180);
   textAlign(CENTER, CENTER); textSize(12);
   let dots = ".".repeat(floor(elapsed*2) % 4);
   text("pensando" + dots, cx, cy + baseRadius + 40);
@@ -267,10 +342,20 @@ function drawResponseText(cx, cy) {
 }
 
 function drawQuestionEcho(cx) {
-  fill(MUTED[0], MUTED[1], MUTED[2], 150);
+  fill(MUTED_CLR[0], MUTED_CLR[1], MUTED_CLR[2], 150);
   textAlign(CENTER, CENTER); textSize(11);
   let y = currentCY - baseRadius - 25;
   text("\u201C" + inputText + "\u201D", cx, y, min(width*0.7, 480));
+}
+
+function drawMeshIndicator() {
+  // Small green dot + text at top-left
+  noStroke();
+  fill(MESH_GREEN[0], MESH_GREEN[1], MESH_GREEN[2], 180 + sin(breathPhase*2)*40);
+  ellipse(24, 28, 7);
+  fill(MESH_GREEN[0], MESH_GREEN[1], MESH_GREEN[2], 120);
+  textAlign(LEFT, CENTER); textSize(9);
+  text("mesh", 32, 28);
 }
 
 function makeParticle(x, y) {
