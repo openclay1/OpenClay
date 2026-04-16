@@ -5,7 +5,7 @@
 let clayPoints = [];
 let numPoints = 120;
 let baseRadius;
-let state = "idle"; // idle | listening | thinking | speaking | recording | muted
+let state = "idle"; // idle | listening | thinking | speaking | recording | muted | executing
 let inputText = "";
 let responseText = "";
 let displayedText = "";
@@ -19,6 +19,19 @@ let filePulse = 0;
 let canvasStatus = ""; // "Escuchando..." | "Procesando..." | ""
 let canvasStatusAlpha = 0;
 let meshActive = false;
+let logPulse = 0; // log write indicator pulse
+let execResultData = null; // data from last sandbox execution
+let execResultTimer = 0;
+
+// Task engine state
+let activeTask = null; // {id, goal, step, current_step}
+let taskPulsePhase = 0;
+let taskCompletePulse = 0; // celebration pulse on completion
+
+// Agent morph animation
+let morphProgress = 1; // 0→1 during color transition
+let morphFrom = [224, 100, 56];
+let morphTo = [224, 100, 56];
 
 // Smooth animation
 let targetCY, currentCY, targetRadius, currentRadius;
@@ -27,7 +40,7 @@ let animInited = false;
 // Colors — warm clay earth
 const BG = [22, 19, 16];
 const SURFACE = [27, 24, 20];
-const CLAY_BASE = [224, 100, 56];
+let CLAY_BASE = [224, 100, 56]; // now mutable for agent color changes
 const TEXT_CLR = [206, 200, 192];
 const MUTED_CLR = [122, 116, 104];
 const MESH_GREEN = [39, 174, 96];
@@ -62,6 +75,10 @@ function setClayState(newState) {
   } else if (newState === 'speaking') {
     state = "speaking";
     canvasStatus = "";
+  } else if (newState === 'executing') {
+    state = "executing";
+    canvasStatus = "Ejecutando...";
+    canvasStatusAlpha = 255;
   } else {
     state = "idle";
     canvasStatus = "";
@@ -89,6 +106,82 @@ function handleSend() {
 }
 
 function triggerPulse() { filePulse = 1.0; }
+function triggerLogPulse() { logPulse = 1.0; }
+
+// ─── Agent color morphing ───
+function hexToRgb(hex) {
+  hex = hex.replace('#', '');
+  return [parseInt(hex.substring(0,2),16), parseInt(hex.substring(2,4),16), parseInt(hex.substring(4,6),16)];
+}
+
+function triggerAgentMorph(colorHex) {
+  morphFrom = [...CLAY_BASE];
+  morphTo = hexToRgb(colorHex);
+  morphProgress = 0;
+  // Burst of particles for the transition
+  for (let i = 0; i < 20; i++) {
+    particles.push(makeParticle(width/2 + random(-baseRadius,baseRadius),
+      (currentCY||height*0.35) + random(-baseRadius,baseRadius)));
+  }
+}
+
+function setClayAccent(colorHex) {
+  let rgb = hexToRgb(colorHex);
+  CLAY_BASE[0] = rgb[0]; CLAY_BASE[1] = rgb[1]; CLAY_BASE[2] = rgb[2];
+  morphFrom = [...rgb]; morphTo = [...rgb]; morphProgress = 1;
+}
+
+// ─── Workflow send (called from index.html) ───
+function handleSendRaw(text, workflowPrompt) {
+  let combined = workflowPrompt + '\n\n' + text;
+  let input = document.getElementById('clay-input');
+  if (input) input.value = '';
+  inputText = text;
+  hintOpacity = 0;
+  state = "thinking";
+  thinkingStart = millis();
+  responseText = ""; displayedText = ""; charIndex = 0;
+  canvasStatus = "";
+  for (let i = 0; i < 15; i++) particles.push(makeParticle(width/2, currentCY || height*0.35));
+  if (typeof addToHistory === 'function') addToHistory('user', text);
+  askOllama(combined);
+}
+
+// ─── Show execution result on canvas ───
+function showExecResult(data) {
+  execResultData = data;
+  execResultTimer = 300; // ~5 seconds at 60fps
+  state = "speaking";
+  if (data.ok) {
+    responseText = "✅ Ejecución exitosa:\n" + (data.stdout || '(sin output)');
+  } else {
+    responseText = "❌ Error en ejecución:\n" + (data.error || data.stderr || 'Unknown error');
+  }
+  displayedText = ""; charIndex = 0;
+}
+
+// ─── Task engine canvas integration ───
+function updateActiveTask(taskInfo) {
+  // Called from index.html status polling
+  if (!taskInfo && activeTask) {
+    // Task just finished — celebration pulse
+    taskCompletePulse = 1.0;
+    activeTask = null;
+  } else {
+    activeTask = taskInfo;
+  }
+}
+
+function triggerTaskComplete() {
+  taskCompletePulse = 1.0;
+  // Big burst of particles
+  for (let i = 0; i < 30; i++) {
+    particles.push(makeParticle(
+      width/2 + random(-baseRadius*1.5, baseRadius*1.5),
+      (currentCY||height*0.35) + random(-baseRadius*1.5, baseRadius*1.5)
+    ));
+  }
+}
 
 // Legacy bridge — still called if setClayState isn't available
 function setRecordingState(recording) {
@@ -157,6 +250,15 @@ function draw() {
     animInited = true;
   }
 
+  // Morph CLAY_BASE color smoothly between agents
+  if (morphProgress < 1) {
+    morphProgress = min(1, morphProgress + 0.02);
+    let ease = morphProgress * morphProgress * (3 - 2 * morphProgress); // smoothstep
+    CLAY_BASE[0] = lerp(morphFrom[0], morphTo[0], ease);
+    CLAY_BASE[1] = lerp(morphFrom[1], morphTo[1], ease);
+    CLAY_BASE[2] = lerp(morphFrom[2], morphTo[2], ease);
+  }
+
   let fullR = min(width, height) * 0.16;
   if (state === "speaking" || (state === "thinking" && responseText.length > 0)) {
     targetRadius = fullR * 0.5; targetCY = height * 0.18;
@@ -165,8 +267,10 @@ function draw() {
   } else if (state === "recording") {
     targetRadius = fullR * 1.05; targetCY = height * 0.35;
   } else if (state === "muted") {
-    // Muted: contract slightly
     targetRadius = fullR * 0.85; targetCY = height * 0.35;
+  } else if (state === "executing") {
+    // Executing: geometric/focused — compact, pulsing
+    targetRadius = fullR * 0.7; targetCY = height * 0.32;
   } else {
     targetRadius = fullR; targetCY = height * 0.35;
   }
@@ -188,8 +292,21 @@ function draw() {
   else if (state === "thinking") drawThinkingState(cx, cy);
   else if (state === "speaking") drawSpeakingState(cx, cy);
   else if (state === "muted") drawMutedState(cx, cy);
+  else if (state === "executing") drawExecutingState(cx, cy);
 
   if (inputText && state !== "idle" && state !== "recording" && state !== "muted") drawQuestionEcho(cx);
+
+  // Log write indicator — small pulsing dot near top-right
+  if (logPulse > 0) {
+    logPulse *= 0.95;
+    if (logPulse < 0.01) logPulse = 0;
+    noStroke();
+    fill(CLAY_BASE[0], CLAY_BASE[1], CLAY_BASE[2], logPulse * 200);
+    ellipse(width - 30, 28, 6 + logPulse * 6);
+    fill(TEXT_CLR[0], TEXT_CLR[1], TEXT_CLR[2], logPulse * 150);
+    textAlign(RIGHT, CENTER); textSize(8);
+    text("log", width - 38, 28);
+  }
 
   // Canvas status text (Escuchando... / Procesando...)
   if (canvasStatusAlpha > 0 && canvasStatus) {
@@ -200,6 +317,24 @@ function draw() {
   // Mesh indicator
   if (meshActive) drawMeshIndicator();
 
+  // Task indicator
+  if (activeTask) {
+    taskPulsePhase += 0.03;
+    drawTaskIndicator(cx, cy);
+  }
+
+  // Task complete celebration
+  if (taskCompletePulse > 0) {
+    taskCompletePulse *= 0.96;
+    if (taskCompletePulse < 0.01) taskCompletePulse = 0;
+    // Expanding ring
+    noFill();
+    stroke(CLAY_BASE[0], CLAY_BASE[1], CLAY_BASE[2], taskCompletePulse * 200);
+    strokeWeight(2 + taskCompletePulse * 3);
+    let ringR = baseRadius * (1.5 + (1 - taskCompletePulse) * 2);
+    ellipse(cx, cy, ringR * 2);
+  }
+
   cursorBlink += 0.05;
 }
 
@@ -208,6 +343,7 @@ function drawGlow(cx, cy) {
   let pulseSize = state === "thinking" ? baseRadius * 2.5 + sin(breathPhase*3)*30
     : state === "recording" ? baseRadius * 2.8 + sin(breathPhase*1.5)*20
     : state === "muted" ? baseRadius * 1.8
+    : state === "executing" ? baseRadius * 2.0 + sin(breathPhase*5)*15
     : baseRadius * 2.2 + sin(breathPhase)*10;
   for (let i = 5; i > 0; i--) {
     let a = map(i, 5, 0, 3, 15);
@@ -230,6 +366,13 @@ function drawClay(cx, cy) {
       targetR += sin(p.angle*2 + breathPhase*2) * baseRadius * 0.06 + nv * baseRadius * 0.08;
     } else if (state === "recording") {
       targetR += sin(breathPhase*1.5 + p.angle*4) * baseRadius * 0.1 + nv * baseRadius * 0.1;
+    } else if (state === "executing") {
+      // Executing: geometric/angular — more structured deformations
+      let facets = 6;
+      let facetAngle = floor(p.angle / (TWO_PI / facets)) * (TWO_PI / facets);
+      let facetBlend = 0.6 + 0.4 * cos((p.angle - facetAngle) * facets);
+      targetR *= facetBlend;
+      targetR += sin(breathPhase * 4 + p.angle * facets) * baseRadius * 0.04;
     } else if (state === "muted") {
       // Muted: very subtle, calm deformation
       targetR += nv * baseRadius * 0.03;
@@ -243,8 +386,10 @@ function drawClay(cx, cy) {
   if (state === "recording") {
     fill(200, 70, 50);
   } else if (state === "muted") {
-    // Desaturated clay — shift hue toward brown/gray
     fill(160, 90, 65);
+  } else if (state === "executing") {
+    // Executing: slightly brighter, electric feel
+    fill(min(255, CLAY_BASE[0]+30), min(255, CLAY_BASE[1]+20), CLAY_BASE[2]);
   } else {
     fill(CLAY_BASE[0], CLAY_BASE[1], CLAY_BASE[2]);
   }
@@ -348,6 +493,58 @@ function drawQuestionEcho(cx) {
   text("\u201C" + inputText + "\u201D", cx, y, min(width*0.7, 480));
 }
 
+function drawExecutingState(cx, cy) {
+  // Geometric spinner around the blob
+  let segments = 6;
+  for (let i = 0; i < segments; i++) {
+    let a = (TWO_PI / segments) * i + breathPhase * 4;
+    let r = baseRadius + 20;
+    let len = 12 + sin(breathPhase * 6 + i * 1.5) * 6;
+    let x1 = cx + cos(a) * r;
+    let y1 = cy + sin(a) * r;
+    let x2 = cx + cos(a) * (r + len);
+    let y2 = cy + sin(a) * (r + len);
+    stroke(CLAY_BASE[0], CLAY_BASE[1], CLAY_BASE[2], 150 + sin(breathPhase*5+i)*80);
+    strokeWeight(2);
+    line(x1, y1, x2, y2);
+  }
+  noStroke();
+  fill(CLAY_BASE[0], CLAY_BASE[1], CLAY_BASE[2], 180 + sin(breathPhase*5)*75);
+  textAlign(CENTER, CENTER); textSize(12);
+  text("⚙ ejecutando...", cx, cy + baseRadius + 40);
+}
+
+function drawTaskIndicator(cx, cy) {
+  // Top-left indicator showing active task
+  let x = 16, y = meshActive ? 50 : 28;
+
+  // Pulsing dot
+  noStroke();
+  let pulse = sin(taskPulsePhase * 3) * 0.3 + 0.7;
+  fill(CLAY_BASE[0], CLAY_BASE[1], CLAY_BASE[2], 200 * pulse);
+  ellipse(x + 4, y, 6 + pulse * 2);
+
+  // Label
+  fill(TEXT_CLR[0], TEXT_CLR[1], TEXT_CLR[2], 160);
+  textAlign(LEFT, CENTER); textSize(8);
+  text("tarea", x + 12, y);
+
+  // Step counter
+  if (activeTask && activeTask.step !== undefined) {
+    fill(CLAY_BASE[0], CLAY_BASE[1], CLAY_BASE[2], 140);
+    textSize(7);
+    text("paso " + activeTask.step, x + 12, y + 11);
+  }
+
+  // Goal preview (truncated)
+  if (activeTask && activeTask.goal) {
+    fill(MUTED_CLR[0], MUTED_CLR[1], MUTED_CLR[2], 100);
+    textSize(7);
+    let goalPreview = activeTask.goal.substring(0, 30) + (activeTask.goal.length > 30 ? "..." : "");
+    text(goalPreview, x + 12, y + 22);
+  }
+}
+
 function drawMeshIndicator() {
   // Small green dot + text at top-left
   noStroke();
@@ -375,6 +572,11 @@ function updateParticles() {
   if (state === "thinking" && frameCount % 10 === 0) {
     particles.push(makeParticle(width/2 + random(-baseRadius,baseRadius),
       currentCY + random(-baseRadius,baseRadius)));
+  }
+  if (state === "executing" && frameCount % 6 === 0) {
+    // Faster, more focused particles for execution
+    let a = random(TWO_PI);
+    particles.push(makeParticle(width/2 + cos(a)*baseRadius, currentCY + sin(a)*baseRadius));
   }
 }
 
