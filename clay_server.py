@@ -343,15 +343,17 @@ Reply ONLY in JSON:
     threading.Thread(target=_worker, daemon=True).start()
 
 # ── Sandbox Execution ───────────────────────────────────────────
-def _execute_code(code, language="python", timeout=30):
-    """Execute code in sandbox directory with timeout."""
+def _execute_code(code, language="python", timeout=30, cwd=None):
+    """Execute code with timeout. cwd defaults to SANDBOX_DIR (UI runner stays sandboxed).
+    Task engine passes BASE_DIR so paths like ./sandbox/... resolve correctly."""
     import tempfile
     SANDBOX_DIR.mkdir(parents=True, exist_ok=True)
+    run_dir = str(cwd) if cwd else str(SANDBOX_DIR)
     tmp_file = None
     if language == "python":
         # Always write to a temp file to avoid -c newline/f-string issues
         tmp_file = tempfile.NamedTemporaryFile(suffix=".py", mode="w",
-                                               delete=False, dir=str(SANDBOX_DIR))
+                                               delete=False, dir=run_dir)
         tmp_file.write(code)
         tmp_file.close()
         cmd = [sys.executable, tmp_file.name]
@@ -361,7 +363,7 @@ def _execute_code(code, language="python", timeout=30):
         return {"ok": False, "error": "Unsupported language", "stdout": "", "stderr": ""}
     try:
         result = subprocess.run(cmd, capture_output=True, text=True,
-                                timeout=timeout, cwd=str(SANDBOX_DIR))
+                                timeout=timeout, cwd=run_dir)
         entry = {
             "timestamp": datetime.now().isoformat(),
             "language": language,
@@ -611,21 +613,30 @@ Your reply must contain ONLY a JSON object — no explanation, no markdown, no c
         return None
 
 def _task_execute_action(action_dict):
-    """Execute an action and return result dict."""
+    """Execute an action and return result dict.
+    bash/python run from BASE_DIR so paths like ./sandbox/... resolve correctly.
+    write is still restricted to SANDBOX_DIR. read resolves relative to BASE_DIR."""
     action = action_dict.get("action", "")
     inp = action_dict.get("input", "")
 
     if action == "python":
-        return _execute_code(inp, "python", timeout=30)
+        return _execute_code(inp, "python", timeout=30, cwd=BASE_DIR)
     elif action == "bash":
-        return _execute_code(inp, "bash", timeout=30)
+        return _execute_code(inp, "bash", timeout=30, cwd=BASE_DIR)
     elif action == "read":
         try:
-            filepath = SANDBOX_DIR / inp.strip()
-            if not filepath.exists():
+            # Resolve relative to BASE_DIR; fall back to SANDBOX_DIR for bare filenames
+            candidate = (BASE_DIR / inp.strip()).resolve()
+            if not candidate.exists():
+                candidate = (SANDBOX_DIR / inp.strip()).resolve()
+            if not candidate.exists():
                 return {"ok": False, "error": f"File not found: {inp}", "stdout": "", "stderr": ""}
-            content = filepath.read_text("utf-8", errors="ignore")[:4000]
+            # Safety: must stay within BASE_DIR
+            candidate.relative_to(BASE_DIR)
+            content = candidate.read_text("utf-8", errors="ignore")[:4000]
             return {"ok": True, "stdout": content, "stderr": ""}
+        except ValueError:
+            return {"ok": False, "error": "Path escapes project directory", "stdout": "", "stderr": ""}
         except Exception as e:
             return {"ok": False, "error": str(e), "stdout": "", "stderr": ""}
     elif action == "write":
