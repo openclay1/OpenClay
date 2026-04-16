@@ -227,6 +227,43 @@
     ::-webkit-scrollbar { width: 5px; }
     ::-webkit-scrollbar-track { background: var(--bg); }
     ::-webkit-scrollbar-thumb { background: var(--surface-2); border-radius: 3px; }
+    /* Demo Mode tiles */
+    .demo-section-label { font-size: 0.62rem; color: var(--muted); text-transform: uppercase;
+      letter-spacing: 0.08em; margin: 0 0 8px; font-weight: 600; }
+    .demo-tiles { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; margin: 0 0 14px; }
+    .demo-tile { background: var(--surface-2); border: 1px solid var(--border);
+      border-radius: var(--radius-lg); padding: 10px 12px; cursor: pointer;
+      transition: all var(--transition); text-align: left; font-family: inherit; }
+    .demo-tile:hover { border-color: var(--agent-color); background: var(--accent-soft);
+      transform: translateY(-1px); box-shadow: var(--shadow-sm); }
+    .demo-tile .dt-icon { font-size: 1.1rem; margin-bottom: 4px; display: block; }
+    .demo-tile .dt-name { font-size: 0.72rem; font-weight: 600; color: var(--text); display: block; }
+    .demo-tile .dt-desc { font-size: 0.6rem; color: var(--muted); margin-top: 2px;
+      line-height: 1.35; display: block; }
+    /* Task progress pill */
+    #task-progress { position: fixed; bottom: 86px; left: 50%; transform: translateX(-50%);
+      z-index: 11; background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius-full); padding: 6px 14px; font-size: 0.68rem; color: var(--text);
+      display: none; align-items: center; gap: 8px;
+      box-shadow: var(--shadow-sm); max-width: calc(100vw - 48px); overflow: hidden;
+      white-space: nowrap; }
+    #task-progress.visible { display: flex; }
+    .tp-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--agent-color);
+      animation: tp-pulse 1.2s ease-in-out infinite; flex-shrink: 0; }
+    @keyframes tp-pulse { 0%,100%{opacity:1;transform:scale(1);}50%{opacity:0.4;transform:scale(0.7);} }
+    .tp-step { color: var(--agent-color); font-weight: 600; flex-shrink: 0; }
+    .tp-label { color: var(--muted); overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+    /* Output file link */
+    .output-link { display: inline-flex; align-items: center; gap: 4px; margin-top: 3px;
+      font-size: 0.65rem; color: var(--agent-color); cursor: pointer;
+      padding: 2px 8px; border: 1px solid rgba(224,100,56,0.3); border-radius: var(--radius-full);
+      background: rgba(224,100,56,0.06); transition: all var(--transition); }
+    .output-link:hover { background: rgba(224,100,56,0.12); border-color: var(--agent-color); }
+    /* Footer */
+    #openclay-footer { position: fixed; bottom: 0; left: 0; right: 0; z-index: 4;
+      text-align: center; padding: 4px 0 5px;
+      font-size: 0.57rem; color: var(--faint); letter-spacing: 0.07em;
+      pointer-events: none; }
   </style>
 </head>
 <body>
@@ -307,11 +344,30 @@
       <!-- Tasks -->
       <div id="tab-tasks" class="tab-content">
         <h3>Tareas aut&oacute;nomas</h3>
+        <p class="demo-section-label">Demos r&aacute;pidos</p>
+        <div class="demo-tiles">
+          <button class="demo-tile" onclick="runDemo('analyze_project_state')">
+            <span class="dt-icon">&#128202;</span>
+            <span class="dt-name">Analyze Project State</span>
+            <span class="dt-desc">Scan files, summarize content, write report</span>
+          </button>
+          <button class="demo-tile" onclick="runDemo('biotech_document_review')">
+            <span class="dt-icon">&#128300;</span>
+            <span class="dt-name">Biotech Document Review</span>
+            <span class="dt-desc">FDA/GMP/ICH compliance review</span>
+          </button>
+          <button class="demo-tile" onclick="runDemo('grant_intelligence_brief')" style="grid-column:1/-1">
+            <span class="dt-icon">&#128203;</span>
+            <span class="dt-name">Grant Intelligence Brief</span>
+            <span class="dt-desc">Score grant alignment with COANA profile &middot; draft abstract</span>
+          </button>
+        </div>
+        <p class="demo-section-label">Nueva tarea</p>
         <div class="task-new-row">
           <input type="text" id="task-goal-input" placeholder="Describe la tarea / Describe the task...">
           <button onclick="createTask()">Crear</button>
         </div>
-        <div id="tasks-list" style="max-height:calc(100vh - 260px);overflow-y:auto;"></div>
+        <div id="tasks-list" style="max-height:calc(100vh - 420px);overflow-y:auto;"></div>
       </div>
       <br><button onclick="toggleSettings()" class="settings-action secondary">Cerrar</button>
     </div>
@@ -320,6 +376,11 @@
   <div id="status-bar">
     <p id="privacy-text">100% local &middot; nada sale de tu computadora</p>
     <p id="memory-status"></p>
+  </div>
+  <div id="task-progress">
+    <span class="tp-dot"></span>
+    <span class="tp-step" id="tp-step">Paso 1</span>
+    <span class="tp-label" id="tp-label">iniciando&hellip;</span>
   </div>
   <div id="disclaimer"></div>
   <div id="controls">
@@ -346,6 +407,7 @@
     </div>
   </div>
 
+  <div id="openclay-footer">COANA Labs &middot; OpenClay v1.3.0 &middot; All processing local &middot; Puerto Rico</div>
   <script src="/src/sketch.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.4/p5.min.js"></script>
 
@@ -730,6 +792,8 @@
     };
 
     // ═══ Status ═══
+    let _lastActiveTaskId = null;
+    let _lastCompletedWithOutput = null;
     async function updateStatus(){
       try{
         const r=await fetch('/api/status',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'});
@@ -744,10 +808,24 @@
         showBadge('mode',d.agent||'modo simple',false);
         if(d.color_accent&&d.color_accent!==currentAgentColor) setAgentColor(d.color_accent);
         if(d.new_ingested>0) showBadge('ingested','Le\u00ED '+d.new_ingested+' archivos',true);
-        // Update task indicator on canvas
+        // Canvas task indicator
         if(typeof updateActiveTask==='function') updateActiveTask(d.active_task||null);
-        if(d.active_task) {
-          showBadge('task','\u2699 Tarea: paso '+d.active_task.step,false);
+        // Progress pill
+        const prog=document.getElementById('task-progress');
+        if(d.active_task){
+          const stepEl=document.getElementById('tp-step');
+          const labelEl=document.getElementById('tp-label');
+          if(stepEl) stepEl.textContent='Paso '+(d.active_task.step||1);
+          if(labelEl) labelEl.textContent=d.active_task.step_label||'ejecutando\u2026';
+          prog&&prog.classList.add('visible');
+          _lastActiveTaskId=d.active_task.id;
+        } else {
+          prog&&prog.classList.remove('visible');
+          // If a task just finished, reload task list for output file links
+          if(_lastActiveTaskId){
+            _lastActiveTaskId=null;
+            loadTasks();
+          }
         }
       }catch(e){}
     }
@@ -771,22 +849,30 @@
         const el=document.getElementById('tasks-list'); if(!el)return; el.innerHTML='';
         const tasks=d.tasks||[];
         if(!tasks.length){el.innerHTML='<p style="font-size:0.78rem;color:var(--faint);padding:12px 0;text-align:center;">Sin tareas a\u00FAn</p>';return;}
-        tasks.slice(0,10).forEach(t=>{
+        tasks.slice(0,15).forEach(t=>{
           const div=document.createElement('div'); div.className='task-item';
-          const goalText=t.goal.length>60?t.goal.substring(0,60)+'...':t.goal;
-          const badgeClass=t.status;
+          const goalText=t.goal.length>60?t.goal.substring(0,60)+'\u2026':t.goal;
           const labels={running:'ejecutando',complete:'completada',failed:'fallida',pending:'pendiente',paused:'pausada'};
-          div.innerHTML='<div class="task-goal">'+escapeHtml(goalText)+'</div>'+
+          const demoLabel=t.demo_type?(' <span style="font-size:0.58rem;color:var(--muted)">\u25b6 '+t.demo_type.replace(/_/g,' ')+'</span>'):'';
+          let html='<div class="task-goal">'+escapeHtml(goalText)+demoLabel+'</div>'+
             '<div class="task-meta">'+
-            '<span class="task-badge '+badgeClass+'">'+(labels[t.status]||t.status)+'</span>'+
+            '<span class="task-badge '+t.status+'">'+(labels[t.status]||t.status)+'</span>'+
             '<span>'+t.steps+' pasos</span>'+
             (t.status==='running'?'<button class="mem-del" onclick="event.stopPropagation();stopTask(\''+t.id+'\')">detener</button>':'')+
-            '</div>'+
-            '<div class="task-steps" id="steps-'+t.id+'"></div>';
+            '</div>';
+          if(t.output_file&&t.status==='complete'){
+            html+='<div class="output-link" onclick="event.stopPropagation();copyOutputPath(\''+escapeHtml(t.output_file)+'\')">&#128196; '+escapeHtml(t.output_file)+'</div>';
+          }
+          html+='<div class="task-steps" id="steps-'+t.id+'"></div>';
+          div.innerHTML=html;
           div.onclick=()=>toggleTaskSteps(t.id);
           el.appendChild(div);
         });
       }catch(e){}
+    }
+    function copyOutputPath(path){
+      const fullPath='sandbox/'+path;
+      showBadge('output','\uD83D\uDCC4 '+fullPath,true);
     }
     async function toggleTaskSteps(taskId){
       const el=document.getElementById('steps-'+taskId);
@@ -820,6 +906,29 @@
         await fetch('/api/tasks/stop',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:taskId})});
         loadTasks();
       }catch(e){}
+    }
+    async function runDemo(type){
+      const goals={
+        analyze_project_state:'Analyze all files in the sandbox directory: list names, sizes, and modified dates, extract 2-sentence summaries from text files, compute total stats, write report to output/',
+        biotech_document_review:'Review the document in the sandbox for biotech compliance: extract objectives, methods, results, flag FDA/GMP/ICH terms, identify missing sections, write structured review to output/',
+        grant_intelligence_brief:'Funding for innovative technologies that improve reliability and privacy in AI systems for healthcare and research institutions.'
+      };
+      const goal=goals[type]||type;
+      if(!settingsOpen){toggleSettings();}
+      switchTab('tasks');
+      document.getElementById('task-goal-input').value=goal;
+      try{
+        const r=await fetch('/api/tasks/create',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({goal,demo_type:type})});
+        const d=await r.json();
+        if(d.ok){
+          document.getElementById('task-goal-input').value='';
+          showBadge('task','\u26a1 Demo iniciado: '+type.replace(/_/g,' '),false);
+          setTimeout(()=>removeBadge('task'),4000);
+          loadTasks();
+        }else{
+          showBadge('task','\u2717 '+(d.error||'Error al crear demo'),true);
+        }
+      }catch(e){showBadge('task','\u2717 Error',true);}
     }
     updateStatus(); setInterval(updateStatus,15000);
 
