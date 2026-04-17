@@ -189,6 +189,7 @@ function setRecordingState(recording) {
 }
 
 async function askOllama(prompt) {
+  const demoThinkStart = Date.now();
   try {
     const resp = await fetch("/api/ask", {
       method: "POST",
@@ -206,6 +207,11 @@ async function askOllama(prompt) {
         state = "speaking"; return;
       }
       if (data.response) {
+        // Demo Mode: hold thinking state for at least 2s so blob looks alive on camera
+        if (window.demoMode) {
+          const elapsed = Date.now() - demoThinkStart;
+          if (elapsed < 2000) await new Promise(r => setTimeout(r, 2000 - elapsed));
+        }
         responseText = data.response;
         state = "speaking";
         if (typeof addToHistory === 'function') addToHistory('assistant', data.response);
@@ -226,7 +232,14 @@ async function askOllama(prompt) {
         try {
           const data = JSON.parse(line);
           if (data.response) { fullText += data.response; responseText = fullText; }
-          if (data.done) state = "speaking";
+          if (data.done) {
+            // Demo Mode: minimum 2s thinking before speaking
+            if (window.demoMode) {
+              const elapsed = Date.now() - demoThinkStart;
+              if (elapsed < 2000) await new Promise(r => setTimeout(r, 2000 - elapsed));
+            }
+            state = "speaking";
+          }
         } catch (e) {}
       }
     }
@@ -461,8 +474,10 @@ function drawThinkingState(cx, cy) {
 function drawSpeakingState(cx, cy) { drawResponseText(cx, cy); }
 
 function drawResponseText(cx, cy) {
+  // Demo Mode: slow typewriter (~1 char per frame). Normal: 3 chars per frame.
+  const charStep = (window.demoMode) ? 1 : 3;
   if (charIndex < responseText.length) {
-    charIndex = min(charIndex + 3, responseText.length);
+    charIndex = min(charIndex + charStep, responseText.length);
     displayedText = responseText.substring(0, charIndex);
   }
   let textBoxY = cy + baseRadius + 25;

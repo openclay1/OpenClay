@@ -264,10 +264,33 @@
       text-align: center; padding: 4px 0 5px;
       font-size: 0.57rem; color: var(--faint); letter-spacing: 0.07em;
       pointer-events: none; }
+    /* Demo Mode toggle */
+    #demo-mode-btn { position: fixed; top: 20px; left: 20px; z-index: 20;
+      background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-full);
+      padding: 5px 12px; font-family: inherit; font-size: 0.68rem; font-weight: 500;
+      color: var(--muted); cursor: pointer; transition: all var(--transition);
+      display: flex; align-items: center; gap: 5px; }
+    #demo-mode-btn:hover { border-color: var(--agent-color); color: var(--text); }
+    #demo-mode-btn.active { background: rgba(192,57,43,0.12); border-color: #c0392b;
+      color: #c0392b; }
+    /* REC indicator */
+    #rec-indicator { position: fixed; top: 20px; right: 64px; z-index: 20;
+      display: none; align-items: center; gap: 6px;
+      font-size: 0.65rem; font-weight: 600; color: #c0392b;
+      letter-spacing: 0.06em; pointer-events: none; }
+    #rec-indicator.visible { display: flex; }
+    .rec-dot { width: 7px; height: 7px; border-radius: 50%; background: #c0392b;
+      animation: rec-pulse 1s ease-in-out infinite; }
+    @keyframes rec-pulse { 0%,100%{opacity:1;} 50%{opacity:0.25;} }
+    /* Output link slide-up animation */
+    @keyframes slide-up { from{opacity:0;transform:translateY(6px);} to{opacity:1;transform:translateY(0);} }
+    .output-link { animation: slide-up 280ms cubic-bezier(0.16,1,0.3,1) both; }
   </style>
 </head>
 <body>
   <div id="title"><h1>OpenClay</h1><p>COANA LABS &middot; LOCAL &middot; PRIVADO &middot; TUYO</p></div>
+  <button id="demo-mode-btn" onclick="toggleDemoMode()" title="Demo Mode — smooth animations for screen recording">&#127916; Demo</button>
+  <div id="rec-indicator"><span class="rec-dot"></span>REC</div>
   <button class="btn-icon" id="settings-btn" onclick="toggleSettings()">&#9881;</button>
   <div id="settings-overlay" onclick="toggleSettings()"></div>
   <div id="settings-panel">
@@ -423,26 +446,56 @@
     let currentAgentColor = '#e06438';
     let pendingExec = null;
 
-    // ═══ Speech Recognition (module scope) ═══
+    // ═══ Speech Recognition ═══
+    // Language fallback: es-PR → es → en-US
+    const VOICE_LANGS = ['es-PR', 'es', 'en-US'];
+    let voiceLangIdx = 0;
     const SpeechRecognitionAPI = window.SpeechRecognition || window.webkitSpeechRecognition;
     let recognition = null;
-    if (SpeechRecognitionAPI) {
-      recognition = new SpeechRecognitionAPI();
-      recognition.lang = 'es-PR'; recognition.continuous = false;
-      recognition.interimResults = false; recognition.maxAlternatives = 1;
-      recognition.onresult = (e) => {
-        document.getElementById('clay-input').value = e.results[0][0].transcript;
+    function _buildRecognition() {
+      if (!SpeechRecognitionAPI) return null;
+      const r = new SpeechRecognitionAPI();
+      r.lang = VOICE_LANGS[voiceLangIdx];
+      r.continuous = false;
+      r.interimResults = false;
+      r.maxAlternatives = 1;
+      r.onresult = (e) => {
+        const transcript = e.results[0][0].transcript.trim();
+        if (!transcript) { setAppState('idle'); return; }
+        const input = document.getElementById('clay-input');
+        input.value = transcript;
         setAppState('idle');
-        showBadge('voice','Procesando...',false); setTimeout(()=>removeBadge('voice'),1500);
+        removeBadge('voice');
+        // Auto-submit after a brief pause so user can see what was transcribed
+        setTimeout(() => {
+          if (input.value.trim() && typeof handleSend === 'function') handleSend();
+        }, 350);
       };
-      recognition.onerror = (e) => {
-        const msgs = {'no-speech':'No escuch\u00E9 nada','audio-capture':'Sin micr\u00F3fono','not-allowed':'Permiso denegado','aborted':''};
-        const msg = msgs[e.error] || 'Error: '+e.error;
-        if(msg){showBadge('voice','\u26A0 '+msg,true);setTimeout(()=>removeBadge('voice'),3000);}
+      r.onerror = (e) => {
+        if (e.error === 'aborted') { setAppState('idle'); return; }
+        // Language not supported → try next fallback
+        if (e.error === 'language-not-supported' && voiceLangIdx < VOICE_LANGS.length - 1) {
+          voiceLangIdx++;
+          recognition = _buildRecognition();
+          setAppState('idle');
+          toggleMic(); // retry with next language
+          return;
+        }
+        const msgs = {
+          'no-speech': 'No escuch\u00E9 nada',
+          'audio-capture': 'Sin micr\u00F3fono',
+          'not-allowed': 'Permiso denegado \u2014 habilita el mic en el navegador',
+          'network': 'Sin conexi\u00F3n de red'
+        };
+        const msg = msgs[e.error] || ('Error: ' + e.error);
+        showBadge('voice', '\u26A0 ' + msg, true);
+        setTimeout(() => removeBadge('voice'), 4000);
         setAppState('idle');
       };
-      recognition.onend = () => { if(appState==='listening') setAppState('idle'); };
+      r.onend = () => { if (appState === 'listening') setAppState('idle'); };
+      return r;
     }
+    recognition = _buildRecognition();
 
     function setAppState(s) {
       appState = s;
@@ -457,12 +510,31 @@
 
     // ═══ Mic ═══
     function toggleMic(){
-      if(!recognition){showBadge('voice','\u26A0 Not supported',true);return;}
-      if(appState==='listening'){recognition.stop();setAppState('idle');return;}
+      if(!recognition){
+        document.getElementById('mic-btn').setAttribute('title','Voice requires Chrome or Safari');
+        showBadge('voice','\u26A0 Voice requires Chrome or Safari',true);
+        setTimeout(()=>removeBadge('voice'),4000);
+        return;
+      }
+      if(appState==='listening'){
+        try{recognition.stop();}catch(e){}
+        setAppState('idle');
+        removeBadge('voice');
+        return;
+      }
       if(appState==='speaking') window.speechSynthesis.cancel();
       setAppState('listening');
-      showBadge('voice','\uD83D\uDD34 Escuchando...',false);
-      try{recognition.start();}catch(e){recognition.abort();setTimeout(()=>{try{recognition.start();}catch(e2){setAppState('idle');}},100);}
+      showBadge('voice','\uD83C\uDF99 Escuchando\u2026',false);
+      try {
+        recognition.start();
+      } catch(e) {
+        // If already started, abort and restart
+        try { recognition.abort(); } catch(e2) {}
+        setTimeout(() => {
+          recognition = _buildRecognition();
+          try { recognition.start(); } catch(e3) { setAppState('idle'); }
+        }, 150);
+      }
     }
 
     // ═══ Mute ═══
@@ -792,6 +864,24 @@
     };
 
     // ═══ Status ═══
+    // ═══ Demo Mode ═══
+    let demoMode = false;
+    window.demoMode = false;
+    let _demoStepLabel = '';
+    let _demoStepChangeTime = 0;
+
+    function toggleDemoMode() {
+      demoMode = !demoMode;
+      window.demoMode = demoMode;
+      const btn = document.getElementById('demo-mode-btn');
+      const rec = document.getElementById('rec-indicator');
+      btn.classList.toggle('active', demoMode);
+      btn.innerHTML = demoMode ? '&#9679; Demo' : '&#127916; Demo';
+      rec.classList.toggle('visible', demoMode);
+      showBadge('demo', demoMode ? '&#127916; Demo Mode ON' : 'Demo Mode OFF', false);
+      setTimeout(() => removeBadge('demo'), 2000);
+    }
+
     let _lastActiveTaskId = null;
     let _lastCompletedWithOutput = null;
     async function updateStatus(){
@@ -815,8 +905,15 @@
         if(d.active_task){
           const stepEl=document.getElementById('tp-step');
           const labelEl=document.getElementById('tp-label');
-          if(stepEl) stepEl.textContent='Paso '+(d.active_task.step||1);
-          if(labelEl) labelEl.textContent=d.active_task.step_label||'ejecutando\u2026';
+          const newLabel = d.active_task.step_label||'ejecutando\u2026';
+          const now = Date.now();
+          // Demo Mode: hold each step label for at least 1.5s before advancing
+          const minHold = demoMode ? 1500 : 0;
+          if (!demoMode || newLabel !== _demoStepLabel || (now - _demoStepChangeTime) >= minHold) {
+            if (newLabel !== _demoStepLabel) { _demoStepLabel = newLabel; _demoStepChangeTime = now; }
+            if(stepEl) stepEl.textContent='Paso '+(d.active_task.step||1);
+            if(labelEl) labelEl.textContent=newLabel;
+          }
           prog&&prog.classList.add('visible');
           _lastActiveTaskId=d.active_task.id;
         } else {

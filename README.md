@@ -1,128 +1,87 @@
-# *OpenClay*
+![version](https://img.shields.io/badge/version-v1.3.1-e06438?style=flat-square)
+![license](https://img.shields.io/badge/license-MIT-cec8c0?style=flat-square)
+![made in](https://img.shields.io/badge/made%20in-Puerto%20Rico%20%F0%9F%87%B5%F0%9F%87%B7-161310?style=flat-square)
 
-I am a local-first AI agent that runs on your machine. I help you get through your day — organizing files, summarizing documents, drafting reports, managing expenses, and executing tasks you describe in plain language. Everything stays on your hardware.
+# OpenClay
 
-## What I do every day
+> Local AI that executes — not simulates. Built by COANA Labs in Puerto Rico.
 
-- **Organize your folders.** Point me at a directory and I sort, rename, and clean it up.
-- **Summarize files and documents.** Drop PDFs, notes, or code — I extract what matters.
-- **Draft reports and notes.** Describe what you need, I write the first version. You refine it.
-- **Track expenses and accounting.** Feed me receipts or transaction notes, I produce summaries you can keep.
-- **Research and synthesize.** Ask a question, I search your wiki and local files, then give you a straight answer.
-- **Ingest knowledge into a wiki.** Drop articles, docs, transcripts — I file them into a local wiki that compounds over time.
-- **Find duplicates and clean up.** I scan directories for redundant files and help you reclaim space.
-- **Plan your day.** Tell me what you're working on, I break it into steps.
+## What it does
 
-## What else I can do
+- **Runs real tasks autonomously** — scans files, writes reports, reviews documents, scores grant applications. No simulation, no hallucinated file systems. Steps resolve against the actual disk.
+- **100% local, zero data egress** — everything runs on your machine via Ollama. No API keys, no subscriptions, no cloud.
+- **Bilingual by default** — responds in Spanish or English depending on how you speak to it. Built for Puerto Rico, works anywhere.
 
-- **Post to Twitter** — optional. If you connect your API keys, I can draft and post tweets. This is not required for anything else to work.
-- **Accept tasks from your phone** — WebSocket bridge with QR code, voice input, file uploads over local WiFi.
-- **Heal and improve myself** — retry failed calls, auto-fix recurring errors, and run a constrained self-build loop that only keeps changes that pass all 21 tests.
-- **Guard every input and output** — prompt injection detection, permission tiers (GREEN/YELLOW/RED), output validation.
+## Demo tasks
 
-## Why not cloud agents?
+| Task | What it does | Output |
+|------|-------------|--------|
+| **Analyze Project State** | Scans `sandbox/`, extracts 2-sentence summaries from text files, computes stats | `sandbox/output/project_state_report.md` |
+| **Biotech Document Review** | Extracts objectives/methods/results, flags FDA/GMP/ICH terms, identifies missing sections | `sandbox/output/document_review_[name].md` |
+| **Grant Intelligence Brief** | Scores grant alignment vs. COANA profile (1–10), drafts 2-paragraph tailored abstract | `sandbox/output/grant_brief_[date].md` |
 
-Cloud-hosted AI agents are powerful. They run on someone else's servers, require their subscription, and your data passes through their infrastructure. When pricing changes, your workflow breaks. When a platform pivots, your agent disappears.
-
-OpenClay runs on your machine. Your data never leaves. No subscription can cut you off. No platform can change the rules on you. Same capability. Full ownership.
-
-If the cloud goes down, OpenClay keeps working. If a provider raises prices, OpenClay costs nothing. If a company pivots to healthcare or enterprise, OpenClay still answers to you.
-
-## Industries
-
-- **Healthcare and life sciences.** Keep patient notes, research summaries, and clinical references in a local wiki that never touches a cloud server.
-- **Finance and accounting.** Ingest transaction records, draft expense reports, and maintain audit trails — all on hardware you control.
-- **Operations and file management.** Organize folders, clean up downloads, find duplicates, and maintain structured archives without uploading anything.
-- **Research and knowledge work.** Build a compounding knowledge base from papers, transcripts, and notes — query it in plain language, keep it forever.
-
-## How to run me
+Click any demo tile in the **Tareas** tab, or run from the CLI:
 
 ```bash
-pip install openclay-agent
+python openclay.py --hunt-grants   # runs all entries in grants_targets.json
+python openclay.py --metrics       # shows execution stats
 ```
 
-Or from source:
+## Performance
+
+Measured across demo task runs (scripted execution, no LLM loop):
+
+| Task Name | Avg Steps | Avg Retries | Success Rate |
+|-----------|-----------|-------------|--------------|
+| analyze_project_state | 4.0 | 0.0 | 100% |
+| biotech_document_review | 5.0 | 0.0 | 100% |
+| grant_intelligence_brief | 4.0 | 0.0 | 100% |
+
+## The principle
+
+> "OpenClay operates in environments that reflect reality. It does not simulate file systems or execution contexts. Actions must resolve truthfully."
+>
+> — COANA Labs Design Principles
+
+All task steps run via actual subprocess execution (`bash`, `python3`). The LLM plans; the system executes; the result is verified by exit code. No mocking.
+
+## Run it
 
 ```bash
 git clone https://github.com/openclay1/OpenClay.git
 cd OpenClay
-pip3 install -r requirements.txt
-python3 app.py
+
+# Install dependencies
+pip install mem0ai
+
+# Pull the model (3B, runs on CPU)
+ollama pull qwen2.5:3b-instruct-q4_K_M
+
+# Start
+python clay_server.py
+
+# Open in browser
+open http://localhost:3000
 ```
 
-I detect your machine, pick the right model, install it, and open a browser panel at `http://127.0.0.1:7861`. The first thing you see is a prompt: *What are we working on?*
+**CLI tools:**
 
-## Architecture
-
-```
-intention → ClayRuntime [guard → permission gate → execute → validate output]
-                ↓
-    model_router [LOCAL_FAST → LOCAL_SMART → CLOUD]
-                ↓
-    agent_backend → Ollama (gemma4:e4b / gemma4:26b)
-                ↓
-    vibe_brain [L0 SOUL.md → L1 BRAIN.md → L2 SESSION.md → L3 DECISIONS.md]
-                ↓
-    memory ← wiki ← logs ← self_build_loop
+```bash
+python openclay.py --metrics       # task execution stats
+python openclay.py --hunt-grants   # automated grant alignment for all targets
+python openclay.py --help          # all commands
 ```
 
-### Memory architecture (Vibe Brain)
+## Hardware
 
-| Level | What | Loaded when | Size |
-|-------|------|-------------|------|
-| L0 | Identity (SOUL.md core traits) | Always | ~100 tokens |
-| L1 | Long-term knowledge (BRAIN.md) | Always | <500 words |
-| L2 | Current task context (SESSION.md) | Always | <200 words |
-| L3 | Past decisions (DECISIONS.md) | On demand only | Unlimited |
+OpenClay runs on any machine with Ollama installed — no GPU required for the 3B model.
 
-Plain markdown memory. No databases. No embeddings. No cloud. BRAIN.md stays under 500 words via a compression cycle that runs every 10 completed tasks. Default load (L0+L1+L2) stays under 2,000 tokens.
+**Claydeck** is coming — a purpose-built device with local compute, LoRa mesh networking, and a custom enclosure. Designed for research teams, clinics, and communities that need AI without infrastructure dependency. Details at [coana.lab](https://coana.lab).
 
-### Model routing tiers
+## Built with
 
-| Tier | Model | Used for |
-|------|-------|----------|
-| LOCAL_FAST | `gemma4:e4b` | Formatting, scheduling, captions, file ops, simple Q&A |
-| LOCAL_SMART | `gemma4:26b` | Wiki ingest/query/lint, summarization, code review, reasoning |
-| CLOUD | Claude / GPT-4o | Only when local fails — architecture, multi-step debugging |
+Ollama · qwen2.5:3b-instruct-q4_K_M · p5.js · Python · Puerto Rico
 
-### Permission tiers
+---
 
-| Tier | Behaviour | Examples |
-|------|-----------|----------|
-| GREEN | Fully autonomous | Read files, wiki ops, local LLM, queue management |
-| YELLOW | Auto-execute, logged | Install stack, pull models, read public URLs |
-| RED | Blocked until approved | Post tweet, run shell command, delete data |
-
-Every module stays under 300 lines. Every module has a `self_test()`. All 22 pass.
-
-### Project structure
-
-```
-app.py              — entry point
-panel.py            — browser UI (Gradio) — conversational first screen
-agent.py            — core loop + ClayRuntime security wrapper
-agent_backend.py    — switchable LLM backend (Ollama)
-model_router.py     — LOCAL_FAST / LOCAL_SMART / CLOUD routing
-input_guard.py      — prompt injection detection + sanitization
-permissions.py      — GREEN/YELLOW/RED action tiers + domain allowlist
-wiki_engine.py      — wiki: ingest, query, lint
-vibe_brain.py       — plain markdown memory (BRAIN.md, SESSION.md, DECISIONS.md)
-memory.py           — AGENTS.md persistent memory
-twitter_post.py     — tweet posting (optional, Tweepy)
-post_flows.py       — social post workflows
-credential_store.py — .env credential writer
-vision_caption.py   — image/video captioning
-mobile_bridge.py    — phone interface (WebSocket + QR + voice)
-self_build_loop.py  — constrained self-editing
-retry_ext.py        — retry decorator (3x, exponential backoff)
-watchdog.py         — 4-tier self-healing daemon
-installer.py        — silent Ollama + tool installation
-```
-
-Built locally. Runs quietly. Gets better slowly. Answers to you.
-
-## License
-
-MIT — it's yours.
-
-[github.com/openclay1/OpenClay](https://github.com/openclay1/OpenClay)
+*COANA Labs · Todo es local. Nada sale de aquí.*

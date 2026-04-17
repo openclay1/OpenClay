@@ -1,0 +1,32 @@
+[
+  {
+    "name": "NSF SBIR Phase I",
+    "url": "https://www.nsf.gov/eng/iip/sbir/",
+    "deadline": "rolling",
+    "focus": "AI, software, research tools, small business innovation"
+  },
+  {
+    "name": "NIH STRIDES",
+    "url": "https://datascience.nih.gov/strides",
+    "deadline": "rolling",
+    "focus": "biomedical data science, AI, local and cloud compute, privacy in healthcare"
+  },
+  {
+    "name": "PR Science Trust",
+    "url": "https://prst.pr.gov",
+    "deadline": "varies",
+    "focus": "Puerto Rico technology, science, innovation, community resilience"
+  },
+  {
+    "name": "Foresight Institute",
+    "url": "https://foresight.org/grants/",
+    "deadline": "rolling",
+    "focus": "AI safety, beneficial technology, technical research for long-term benefit"
+  },
+  {
+    "name": "EDA Build to Scale",
+    "url": "https://eda.gov/programs/build-to-scale",
+    "deadline": "annual",
+    "focus": "regional innovation ecosystems, technology startups, economic resilience"
+  }
+]
