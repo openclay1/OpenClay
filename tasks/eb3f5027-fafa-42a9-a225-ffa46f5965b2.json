@@ -1,0 +1,47 @@
+{
+  "id": "eb3f5027-fafa-42a9-a225-ffa46f5965b2",
+  "goal": "AI-driven medical technologies, biotechnology, genomics — Puerto Rico. (Grant: PRSTRT BioLeap Life Sciences Accelerator, Deadline: Rolling cohorts)",
+  "agent": "Clay General",
+  "status": "complete",
+  "created_at": "2026-04-17T11:19:40.281722",
+  "updated_at": "2026-04-17T12:09:57.383507",
+  "steps": [
+    {
+      "step_num": 1,
+      "type": "execute",
+      "description": "read: coana_profile.md — load project profile for alignment scoring",
+      "result": "Loaded 3,000 chars from coana_profile.md",
+      "success": true,
+      "timestamp": "2026-04-17T11:19:40.286775"
+    },
+    {
+      "step_num": 2,
+      "type": "execute",
+      "description": "python: score grant-to-profile alignment (1-10 scale with reasoning)",
+      "result": "SCORE: 7\nREASONING: The grant opportunity aligns well with the project profile in terms of AI-driven technologies and biotechnology, particularly focusing on local infrastructure resilience. However, there are some gaps regarding specific regulatory compliance (e.g., FDA 21 CFR 312, EU GMP Annex 1) that are not fully addressed by OpenClay as descri",
+      "success": true,
+      "timestamp": "2026-04-17T11:20:29.748518"
+    },
+    {
+      "step_num": 3,
+      "type": "execute",
+      "description": "python: draft 2-paragraph tailored abstract matching grant language to project profile",
+      "result": "Healthcare and research institutions face a critical challenge: deploying reliable, privacy-preserving AI systems in environments where data security is non-negotiable. OpenClay directly addresses this need through a zero-data-egress architecture that delivers full AI capabilities while ensuring sen…",
+      "success": true,
+      "timestamp": "2026-04-17T12:09:57.378649"
+    },
+    {
+      "step_num": 4,
+      "type": "execute",
+      "description": "write: output/grant_brief_2026-04-17.md — grant intelligence brief with alignment score and abstract",
+      "result": "Written 2,634 bytes to output/grant_brief_2026-04-17.md",
+      "success": true,
+      "timestamp": "2026-04-17T12:09:57.382876"
+    }
+  ],
+  "final_result": "Alignment score: 7/10\nAbstract drafted for: \"AI-driven medical technologies, biotechnology, genomics — Pu…\"\nBrief saved to sandbox/output/grant_brief_2026-04-17.md",
+  "retry_count": 0,
+  "max_retries": 3,
+  "demo_type": "grant_intelligence_brief",
+  "output_file": "output/grant_brief_2026-04-17.md"
+}

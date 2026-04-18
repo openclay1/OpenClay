@@ -1,0 +1,47 @@
+{
+  "id": "8ef658b5-f990-4fe0-b5e8-32b2fade7f94",
+  "goal": "STEM research infrastructure in EPSCoR-eligible territories including Puerto Rico. (Grant: NSF EPSCoR Research Infrastructure Improvement, Deadline: Check NSF portal)",
+  "agent": "Clay General",
+  "status": "complete",
+  "created_at": "2026-04-17T11:15:49.962126",
+  "updated_at": "2026-04-17T11:17:44.978239",
+  "steps": [
+    {
+      "step_num": 1,
+      "type": "execute",
+      "description": "read: coana_profile.md — load project profile for alignment scoring",
+      "result": "Loaded 3,000 chars from coana_profile.md",
+      "success": true,
+      "timestamp": "2026-04-17T11:15:49.969453"
+    },
+    {
+      "step_num": 2,
+      "type": "execute",
+      "description": "python: score grant-to-profile alignment (1-10 scale with reasoning)",
+      "result": "SCORE: 8\nREASONING: Strong alignment in AI reliability and privacy for healthcare and research. Local-first architecture directly addresses institutional data privacy requirements.\nKEY_MATCHES: AI reliability, privacy, healthcare, research institutions, local processing\nGAPS: More explicit clinical deployment evidence would strengthen the applicati",
+      "success": true,
+      "timestamp": "2026-04-17T11:16:44.972389"
+    },
+    {
+      "step_num": 3,
+      "type": "execute",
+      "description": "python: draft 2-paragraph tailored abstract matching grant language to project profile",
+      "result": "Healthcare and research institutions face a critical challenge: deploying reliable, privacy-preserving AI systems in environments where data security is non-negotiable. OpenClay directly addresses this need through a zero-data-egress architecture that delivers full AI capabilities while ensuring sen…",
+      "success": true,
+      "timestamp": "2026-04-17T11:17:44.975507"
+    },
+    {
+      "step_num": 4,
+      "type": "execute",
+      "description": "write: output/grant_brief_2026-04-17.md — grant intelligence brief with alignment score and abstract",
+      "result": "Written 2,445 bytes to output/grant_brief_2026-04-17.md",
+      "success": true,
+      "timestamp": "2026-04-17T11:17:44.977452"
+    }
+  ],
+  "final_result": "Alignment score: 8/10\nAbstract drafted for: \"STEM research infrastructure in EPSCoR-eligible territories …\"\nBrief saved to sandbox/output/grant_brief_2026-04-17.md",
+  "retry_count": 0,
+  "max_retries": 3,
+  "demo_type": "grant_intelligence_brief",
+  "output_file": "output/grant_brief_2026-04-17.md"
+}

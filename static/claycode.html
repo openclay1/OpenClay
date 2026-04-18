@@ -1,0 +1,1120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Clay Code — OpenClay Pro</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600&display=swap">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:        #0d0d0d;
+      --surface:   #111111;
+      --surface-2: #161616;
+      --border:    #1e1e1e;
+      --border-2:  #2a2a2a;
+      --accent:    #00FF9C;
+      --accent-dim: rgba(0,255,156,0.12);
+      --text:      #d4d4d4;
+      --muted:     #666;
+      --faint:     #333;
+      --red:       #ff5f57;
+      --yellow:    #ffbd2e;
+      --sidebar-w: 240px;
+      --chat-w:    340px;
+      --bottom-h:  160px;
+    }
+
+    html, body { height: 100%; overflow: hidden; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'JetBrains Mono', 'Courier New', monospace;
+      font-size: 13px;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* ── Top bar ── */
+    #topbar {
+      height: 38px;
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      padding: 0 14px;
+      gap: 16px;
+      flex-shrink: 0;
+      user-select: none;
+    }
+    #topbar .brand {
+      color: var(--accent);
+      font-weight: 600;
+      font-size: 0.8rem;
+      letter-spacing: 0.04em;
+    }
+    #topbar .sep { color: var(--faint); }
+    #topbar .file-label { color: var(--muted); font-size: 0.75rem; }
+    #topbar .spacer { flex: 1; }
+    #topbar button {
+      background: none;
+      border: 1px solid var(--border-2);
+      border-radius: 4px;
+      color: var(--muted);
+      font-family: inherit;
+      font-size: 0.72rem;
+      padding: 3px 10px;
+      cursor: pointer;
+      transition: all 120ms;
+    }
+    #topbar button:hover { border-color: var(--accent); color: var(--accent); }
+    #topbar button.primary {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: #000;
+      font-weight: 600;
+    }
+    #topbar button.primary:hover { opacity: 0.85; }
+
+    /* ── Main layout ── */
+    #main {
+      flex: 1;
+      display: flex;
+      overflow: hidden;
+    }
+
+    /* ── Sidebar — file tree ── */
+    #sidebar {
+      width: var(--sidebar-w);
+      background: var(--surface);
+      border-right: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      flex-shrink: 0;
+    }
+    #sidebar-header {
+      padding: 10px 12px 8px;
+      font-size: 0.68rem;
+      color: var(--muted);
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    #sidebar-header button {
+      margin-left: auto;
+      background: none;
+      border: none;
+      color: var(--muted);
+      cursor: pointer;
+      font-size: 0.75rem;
+      padding: 1px 4px;
+      border-radius: 3px;
+    }
+    #sidebar-header button:hover { color: var(--accent); }
+    #file-tree {
+      flex: 1;
+      overflow-y: auto;
+      padding: 4px 0;
+    }
+    #file-tree::-webkit-scrollbar { width: 4px; }
+    #file-tree::-webkit-scrollbar-track { background: transparent; }
+    #file-tree::-webkit-scrollbar-thumb { background: var(--faint); border-radius: 2px; }
+
+    .tree-dir {
+      padding: 3px 12px;
+      font-size: 0.72rem;
+      color: var(--muted);
+      letter-spacing: 0.04em;
+      margin-top: 6px;
+    }
+    .tree-file {
+      padding: 3px 12px 3px 20px;
+      font-size: 0.75rem;
+      color: var(--text);
+      cursor: pointer;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      border-left: 2px solid transparent;
+      transition: all 80ms;
+    }
+    .tree-file:hover { background: var(--surface-2); color: var(--accent); }
+    .tree-file.active {
+      background: var(--accent-dim);
+      border-left-color: var(--accent);
+      color: var(--accent);
+    }
+
+    /* ── Center — diff / code view ── */
+    #center {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      min-width: 0;
+    }
+    #center-tabs {
+      height: 32px;
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: stretch;
+      flex-shrink: 0;
+    }
+    .tab-btn {
+      padding: 0 16px;
+      background: none;
+      border: none;
+      border-bottom: 2px solid transparent;
+      color: var(--muted);
+      font-family: inherit;
+      font-size: 0.72rem;
+      cursor: pointer;
+      transition: all 120ms;
+    }
+    .tab-btn:hover { color: var(--text); }
+    .tab-btn.active { color: var(--accent); border-bottom-color: var(--accent); }
+    #center-content {
+      flex: 1;
+      overflow: auto;
+      padding: 16px;
+      position: relative;
+    }
+    #center-content::-webkit-scrollbar { width: 6px; }
+    #center-content::-webkit-scrollbar-track { background: transparent; }
+    #center-content::-webkit-scrollbar-thumb { background: var(--faint); border-radius: 3px; }
+
+    #code-view {
+      display: none;
+    }
+    #code-view.visible { display: block; }
+    #code-view pre {
+      margin: 0;
+      font-size: 0.8rem;
+      line-height: 1.6;
+      user-select: text;
+    }
+    #code-view pre code {
+      font-family: 'JetBrains Mono', monospace !important;
+    }
+
+    #diff-view {
+      display: none;
+      font-size: 0.8rem;
+      line-height: 1.6;
+      user-select: text;
+    }
+    #diff-view.visible { display: block; }
+    .diff-line { padding: 0 4px; white-space: pre; font-family: 'JetBrains Mono', monospace; }
+    .diff-add  { background: rgba(0,255,100,0.08); color: #7eff9e; }
+    .diff-del  { background: rgba(255,60,60,0.08); color: #ff7b7b; }
+    .diff-hunk { color: var(--muted); }
+    .diff-ctx  { color: var(--text); }
+
+    #placeholder {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      height: 100%;
+      color: var(--faint);
+      font-size: 0.8rem;
+      flex-direction: column;
+      gap: 8px;
+    }
+    #placeholder .hint { font-size: 0.7rem; color: var(--faint); }
+
+    /* ── Bottom — task output terminal ── */
+    #bottom {
+      height: var(--bottom-h);
+      background: var(--bg);
+      border-top: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      flex-shrink: 0;
+    }
+    #bottom-header {
+      height: 28px;
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      padding: 0 12px;
+      gap: 10px;
+      flex-shrink: 0;
+    }
+    #bottom-header span {
+      font-size: 0.68rem;
+      color: var(--muted);
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+    }
+    #task-status-dot {
+      width: 6px; height: 6px;
+      border-radius: 50%;
+      background: var(--faint);
+      transition: background 300ms;
+    }
+    #task-status-dot.running { background: var(--accent); animation: blink 1s ease-in-out infinite; }
+    #task-status-dot.complete { background: var(--accent); animation: none; }
+    #task-status-dot.failed  { background: var(--red); animation: none; }
+    @keyframes blink { 0%,100%{opacity:1;} 50%{opacity:0.3;} }
+
+    #terminal-output {
+      flex: 1;
+      overflow-y: auto;
+      padding: 8px 14px;
+      font-size: 0.75rem;
+      line-height: 1.55;
+      user-select: text;
+      color: var(--text);
+    }
+    #terminal-output::-webkit-scrollbar { width: 4px; }
+    #terminal-output::-webkit-scrollbar-thumb { background: var(--faint); border-radius: 2px; }
+    .term-step { color: var(--muted); }
+    .term-ok    { color: var(--accent); }
+    .term-fail  { color: var(--red); }
+    .term-result { color: var(--text); padding-left: 16px; }
+
+    /* ── Bouncing dots (thinking bubble) ── */
+    .thinking-bubble {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      padding: 10px 12px;
+    }
+    .thinking-bubble .dot {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: var(--accent);
+      animation: dot-bounce 0.9s ease-in-out infinite;
+    }
+    .thinking-bubble .dot:nth-child(2) { animation-delay: 0.15s; }
+    .thinking-bubble .dot:nth-child(3) { animation-delay: 0.30s; }
+    @keyframes dot-bounce {
+      0%,80%,100% { transform: translateY(0); opacity: 0.5; }
+      40%          { transform: translateY(-6px); opacity: 1; }
+    }
+    .thinking-bubble .elapsed {
+      font-size: 0.62rem;
+      color: var(--muted);
+      margin-left: 4px;
+    }
+    /* ── History sidebar ── */
+    #history-sidebar {
+      position: absolute;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: var(--surface);
+      z-index: 10;
+      display: none;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    #history-sidebar.open { display: flex; }
+    #history-sidebar-header {
+      height: 38px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      padding: 0 14px;
+      gap: 8px;
+      font-size: 0.72rem;
+      color: var(--muted);
+      flex-shrink: 0;
+    }
+    #history-sidebar-header button {
+      margin-left: auto;
+      background: none; border: none;
+      color: var(--muted); cursor: pointer;
+      font-size: 0.78rem; padding: 2px 6px;
+      border-radius: 3px;
+    }
+    #history-sidebar-header button:hover { color: var(--accent); }
+    #history-list {
+      flex: 1;
+      overflow-y: auto;
+      padding: 6px 0;
+    }
+    .hist-item {
+      padding: 8px 14px;
+      cursor: pointer;
+      font-size: 0.72rem;
+      line-height: 1.4;
+      border-bottom: 1px solid var(--border);
+    }
+    .hist-item:hover { background: var(--surface-2); color: var(--accent); }
+    .hist-item .hist-role { font-size: 0.62rem; color: var(--muted); margin-bottom: 2px; text-transform: uppercase; }
+    .hist-item .hist-text { color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    /* keep thinking dot hidden (legacy) */
+    #thinking-dot { display: none !important; }
+    #thinking-label { display: none !important; }
+    @keyframes breathe {
+      0%,100% { opacity: 1; transform: scale(1); }
+      50%      { opacity: 0.25; transform: scale(0.65); }
+    }
+    #thinking-label {
+      font-size: 0.62rem;
+      color: var(--accent);
+      display: none;
+      letter-spacing: 0.04em;
+    }
+    #thinking-label.active { display: block; }
+
+    /* ── Clear history button ── */
+    #clear-history-btn {
+      background: none;
+      border: none;
+      color: transparent;
+      font-size: 0.72rem;
+      cursor: pointer;
+      padding: 2px 4px;
+      border-radius: 3px;
+      margin-left: auto;
+      transition: color 150ms;
+    }
+    #chat-header:hover #clear-history-btn { color: var(--faint); }
+    #clear-history-btn:hover { color: var(--red) !important; }
+
+    /* ── Right — chat panel ── */
+    #chat-panel {
+      width: var(--chat-w);
+      background: var(--surface);
+      border-left: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      flex-shrink: 0;
+    }
+    #chat-header {
+      height: 38px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      padding: 0 14px;
+      gap: 8px;
+      flex-shrink: 0;
+    }
+    #chat-header .agent-dot {
+      width: 7px; height: 7px;
+      border-radius: 50%;
+      background: var(--accent);
+    }
+    #chat-header .agent-name {
+      font-size: 0.75rem;
+      color: var(--accent);
+      font-weight: 500;
+    }
+    #chat-header .agent-sub {
+      font-size: 0.65rem;
+      color: var(--muted);
+    }
+    #chat-messages {
+      flex: 1;
+      overflow-y: auto;
+      padding: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    #chat-messages::-webkit-scrollbar { width: 4px; }
+    #chat-messages::-webkit-scrollbar-thumb { background: var(--faint); border-radius: 2px; }
+
+    .msg {
+      max-width: 100%;
+      line-height: 1.55;
+      font-size: 0.78rem;
+      user-select: text;
+    }
+    .msg.user { color: var(--text); }
+    .msg.user .bubble {
+      background: var(--surface-2);
+      border: 1px solid var(--border-2);
+      border-radius: 6px 6px 2px 6px;
+      padding: 8px 10px;
+    }
+    .msg.assistant .bubble {
+      background: var(--accent-dim);
+      border: 1px solid rgba(0,255,156,0.2);
+      border-radius: 6px 6px 6px 2px;
+      padding: 8px 10px;
+      color: var(--text);
+    }
+    .msg .role { font-size: 0.65rem; color: var(--muted); margin-bottom: 3px; }
+    .msg code {
+      background: rgba(0,0,0,0.4);
+      padding: 1px 5px;
+      border-radius: 3px;
+      font-size: 0.73rem;
+    }
+
+    #chat-input-area {
+      border-top: 1px solid var(--border);
+      padding: 10px;
+      display: flex;
+      gap: 8px;
+      align-items: flex-end;
+    }
+    #chat-input {
+      flex: 1;
+      background: var(--bg);
+      border: 1px solid var(--border-2);
+      border-radius: 6px;
+      color: var(--text);
+      font-family: inherit;
+      font-size: 0.78rem;
+      padding: 8px 10px;
+      resize: none;
+      outline: none;
+      min-height: 36px;
+      max-height: 120px;
+      line-height: 1.5;
+      transition: border-color 150ms;
+    }
+    #chat-input:focus { border-color: var(--accent); }
+    #chat-send {
+      background: var(--accent);
+      border: none;
+      border-radius: 6px;
+      color: #000;
+      font-family: inherit;
+      font-size: 0.78rem;
+      font-weight: 600;
+      padding: 8px 14px;
+      cursor: pointer;
+      transition: opacity 150ms;
+      flex-shrink: 0;
+      align-self: flex-end;
+    }
+    #chat-send:hover { opacity: 0.8; }
+    #chat-send:disabled { opacity: 0.4; cursor: default; }
+
+    /* scrollbar global */
+    * { scrollbar-color: var(--faint) transparent; scrollbar-width: thin; }
+  </style>
+</head>
+<body>
+
+<!-- Top bar -->
+<div id="topbar">
+  <span class="brand">Clay Code</span>
+  <span class="sep">/</span>
+  <span class="file-label" id="active-file-label">no file selected</span>
+  <div class="spacer"></div>
+  <button onclick="runGitDiff()">git diff</button>
+  <button onclick="runGitDiffStaged()">diff --staged</button>
+  <button class="primary" onclick="openApproveModal()">commit…</button>
+  <button onclick="window.location='/'">← back</button>
+</div>
+
+<!-- Main layout -->
+<div id="main">
+
+  <!-- Sidebar -->
+  <div id="sidebar">
+    <div id="sidebar-header">
+      Files
+      <button onclick="loadFileTree()" title="Refresh">↺</button>
+    </div>
+    <div id="file-tree"><div class="tree-file" style="color:var(--faint);padding-left:12px">Loading…</div></div>
+  </div>
+
+  <!-- Center -->
+  <div id="center">
+    <div id="center-tabs">
+      <button class="tab-btn active" id="tab-diff" onclick="switchTab('diff')">diff</button>
+      <button class="tab-btn" id="tab-code" onclick="switchTab('code')">source</button>
+    </div>
+    <div id="center-content">
+      <div id="placeholder">
+        <span>Select a file or run git diff</span>
+        <span class="hint">All text is selectable — no canvas</span>
+      </div>
+      <div id="diff-view"></div>
+      <div id="code-view"><pre><code id="code-block"></code></pre></div>
+    </div>
+
+    <!-- Bottom terminal -->
+    <div id="bottom">
+      <div id="bottom-header">
+        <div id="task-status-dot"></div>
+        <span>Task Output</span>
+        <span id="task-label" style="color:var(--text);font-size:0.72rem;margin-left:4px"></span>
+        <div style="flex:1"></div>
+        <button onclick="clearTerminal()" style="background:none;border:none;color:var(--faint);font-family:inherit;font-size:0.7rem;cursor:pointer;padding:2px 6px;" onmouseover="this.style.color='var(--text)'" onmouseout="this.style.color='var(--faint)'">clear</button>
+      </div>
+      <div id="terminal-output"></div>
+    </div>
+  </div>
+
+  <!-- Right chat -->
+  <div id="chat-panel" style="position:relative;">
+    <!-- History sidebar (overlays chat) -->
+    <div id="history-sidebar">
+      <div id="history-sidebar-header">
+        <span>Recent messages</span>
+        <button onclick="toggleHistorySidebar()" title="Close">✕</button>
+      </div>
+      <div id="history-list"></div>
+    </div>
+    <div id="chat-header">
+      <div class="agent-dot"></div>
+      <div>
+        <div class="agent-name">Clay Coder</div>
+        <div class="agent-sub">LOCAL_SMART · diff-first</div>
+      </div>
+      <div style="flex:1"></div>
+      <button onclick="toggleHistorySidebar()" title="Message history" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:0.9rem;padding:2px 5px;border-radius:3px;" onmouseover="this.style.color='var(--accent)'" onmouseout="this.style.color='var(--muted)'">🕐</button>
+      <button id="clear-history-btn" onclick="clearHistory()" title="Clear chat history">🗑</button>
+    </div>
+    <div id="chat-messages"></div>
+    <div id="chat-input-area">
+      <textarea id="chat-input" rows="1" placeholder="Ask Clay Coder…" onkeydown="handleKey(event)" oninput="autoResize(this)"></textarea>
+      <button id="chat-send" onclick="sendMessage()">send</button>
+    </div>
+  </div>
+
+</div>
+
+<!-- Commit approval modal (inline, no external deps) -->
+<div id="commit-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:100;align-items:center;justify-content:center;">
+  <div style="background:#141414;border:1px solid #2a2a2a;border-radius:10px;padding:28px 24px;width:400px;max-width:90vw;">
+    <div style="font-size:0.8rem;color:#00FF9C;margin-bottom:14px;font-weight:600;">Approve Git Commit</div>
+    <div style="font-size:0.75rem;color:#888;margin-bottom:12px;line-height:1.5;">
+      This will run <code style="background:#0d0d0d;padding:2px 6px;border-radius:3px;">git add -A && git commit</code>.<br>
+      Enter a commit message and confirm.
+    </div>
+    <input id="commit-msg" type="text" placeholder="commit message…"
+      style="width:100%;background:#0d0d0d;border:1px solid #2a2a2a;border-radius:6px;
+             padding:8px 12px;color:#d4d4d4;font-family:inherit;font-size:0.8rem;outline:none;margin-bottom:14px;"
+      onfocus="this.style.borderColor='#00FF9C'" onblur="this.style.borderColor='#2a2a2a'">
+    <div style="display:flex;gap:10px;justify-content:flex-end;">
+      <button onclick="closeApproveModal()"
+        style="background:none;border:1px solid #2a2a2a;border-radius:6px;color:#888;font-family:inherit;
+               font-size:0.78rem;padding:7px 16px;cursor:pointer;">cancel</button>
+      <button onclick="approveCommit()"
+        style="background:#00FF9C;border:none;border-radius:6px;color:#000;font-family:inherit;
+               font-size:0.78rem;font-weight:600;padding:7px 16px;cursor:pointer;">approve & commit</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── State ─────────────────────────────────────────────
+let activeFile = null;
+let currentTab = 'diff';
+let taskPollInterval = null;
+let _activatingClayCoder = false;
+
+const HISTORY_KEY = 'claycode_history';
+const HISTORY_MAX = 50;
+const READY_MSG = "Ready. Select a file from the tree or ask me to read, diff, or edit something. I'll show a diff before writing anything.";
+
+// ── Init ──────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', () => {
+  activateClayCoderAgent();
+  loadFileTree();
+  loadHistory();
+  pollActiveTask();
+  taskPollInterval = setInterval(pollActiveTask, 3000);
+});
+
+async function activateClayCoderAgent() {
+  if (_activatingClayCoder) return;
+  _activatingClayCoder = true;
+  try {
+    await fetch('/api/agents/select', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({name: 'Clay Coder'})
+    });
+  } catch(e) {}
+}
+
+// ── localStorage history ──────────────────────────────
+function loadHistory() {
+  const msgs = document.getElementById('chat-messages');
+  let stored = [];
+  try { stored = JSON.parse(localStorage.getItem(HISTORY_KEY) || '[]'); } catch(e) {}
+  if (stored.length === 0) {
+    // Fresh session — show ready message, don't persist it
+    const el = document.createElement('div');
+    el.className = 'msg assistant';
+    el.innerHTML = '<div class="role">clay coder</div><div class="bubble">' + escHtml(READY_MSG) + '</div>';
+    msgs.appendChild(el);
+  } else {
+    for (const m of stored) _renderMsg(m.role, m.content);
+    msgs.scrollTop = msgs.scrollHeight;
+  }
+}
+
+function _saveToHistory(role, content) {
+  let stored = [];
+  try { stored = JSON.parse(localStorage.getItem(HISTORY_KEY) || '[]'); } catch(e) {}
+  stored.push({role, content, timestamp: new Date().toISOString()});
+  if (stored.length > HISTORY_MAX) stored = stored.slice(stored.length - HISTORY_MAX);
+  try { localStorage.setItem(HISTORY_KEY, JSON.stringify(stored)); } catch(e) {}
+}
+
+function clearHistory() {
+  try { localStorage.removeItem(HISTORY_KEY); } catch(e) {}
+  const msgs = document.getElementById('chat-messages');
+  msgs.innerHTML = '';
+  const el = document.createElement('div');
+  el.className = 'msg assistant';
+  el.innerHTML = '<div class="role">clay coder</div><div class="bubble">' + escHtml(READY_MSG) + '</div>';
+  msgs.appendChild(el);
+}
+
+function _renderMsg(role, content) {
+  const msgs = document.getElementById('chat-messages');
+  const el = document.createElement('div');
+  el.className = `msg ${role}`;
+  el.innerHTML = `<div class="role">${role === 'user' ? 'you' : 'clay coder'}</div><div class="bubble">${escHtml(content)}</div>`;
+  msgs.appendChild(el);
+}
+
+// ── History sidebar ───────────────────────────────────
+function toggleHistorySidebar() {
+  const sidebar = document.getElementById('history-sidebar');
+  const isOpen = sidebar.classList.toggle('open');
+  if (isOpen) renderHistorySidebar();
+}
+
+function renderHistorySidebar() {
+  const list = document.getElementById('history-list');
+  let stored = [];
+  try { stored = JSON.parse(localStorage.getItem(HISTORY_KEY) || '[]'); } catch(e) {}
+  if (!stored.length) {
+    list.innerHTML = '<div style="padding:14px;font-size:0.72rem;color:var(--muted)">No history yet.</div>';
+    return;
+  }
+  // Show last 20, newest first
+  const items = stored.slice(-20).reverse();
+  list.innerHTML = '';
+  for (const m of items) {
+    const el = document.createElement('div');
+    el.className = 'hist-item';
+    const ts = m.timestamp ? new Date(m.timestamp).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}) : '';
+    el.innerHTML = `<div class="hist-role">${m.role === 'user' ? 'you' : 'clay coder'} ${ts}</div><div class="hist-text">${escHtml(m.content)}</div>`;
+    if (m.role === 'user') {
+      el.onclick = () => {
+        document.getElementById('chat-input').value = m.content;
+        document.getElementById('chat-input').focus();
+        toggleHistorySidebar();
+      };
+    }
+    list.appendChild(el);
+  }
+}
+
+// ── Thinking bubble ───────────────────────────────────
+let _thinkingBubble = null;
+let _thinkingInterval = null;
+let _thinkingStart = 0;
+
+function showThinkingBubble() {
+  const msgs = document.getElementById('chat-messages');
+  _thinkingBubble = document.createElement('div');
+  _thinkingBubble.className = 'msg assistant';
+  _thinkingBubble.id = 'thinking-bubble';
+  _thinkingBubble.innerHTML = '<div class="role">clay coder</div><div class="bubble"><div class="thinking-bubble"><div class="dot"></div><div class="dot"></div><div class="dot"></div><span class="elapsed">thinking…</span></div></div>';
+  msgs.appendChild(_thinkingBubble);
+  msgs.scrollTop = msgs.scrollHeight;
+  _thinkingStart = Date.now();
+  _thinkingInterval = setInterval(() => {
+    const el = document.querySelector('#thinking-bubble .elapsed');
+    if (el) el.textContent = `thinking… ${Math.floor((Date.now() - _thinkingStart) / 1000)}s`;
+  }, 1000);
+}
+
+function removeThinkingBubble() {
+  clearInterval(_thinkingInterval);
+  _thinkingInterval = null;
+  if (_thinkingBubble) {
+    _thinkingBubble.remove();
+    _thinkingBubble = null;
+  }
+}
+
+// ── File tree ─────────────────────────────────────────
+async function loadFileTree() {
+  const tree = document.getElementById('file-tree');
+  try {
+    const res = await fetch('/api/files/tree');
+    const data = await res.json();
+    renderTree(data.tree || []);
+  } catch(e) {
+    tree.innerHTML = '<div class="tree-file" style="color:var(--red)">Failed to load tree</div>';
+  }
+}
+
+function renderTree(files) {
+  const tree = document.getElementById('file-tree');
+  if (!files.length) {
+    tree.innerHTML = '<div class="tree-file" style="color:var(--faint)">No files found</div>';
+    return;
+  }
+  // Group by top-level directory
+  const dirs = {};
+  for (const f of files) {
+    const parts = f.path.split('/');
+    const dir = parts.length > 1 ? parts[0] : '.';
+    if (!dirs[dir]) dirs[dir] = [];
+    dirs[dir].push(f);
+  }
+  let html = '';
+  for (const [dir, items] of Object.entries(dirs)) {
+    html += `<div class="tree-dir">${dir === '.' ? 'root' : dir}/</div>`;
+    for (const item of items) {
+      const name = item.path.split('/').pop();
+      const ext = name.split('.').pop();
+      const icon = extIcon(ext);
+      html += `<div class="tree-file${item.path === activeFile ? ' active' : ''}"
+        onclick="openFile('${escHtml(item.path)}')"
+        title="${escHtml(item.path)} (${item.size} B)">${icon} ${escHtml(name)}</div>`;
+    }
+  }
+  tree.innerHTML = html;
+}
+
+function extIcon(ext) {
+  const icons = {py:'🐍', js:'🟨', ts:'🔷', html:'🌐', css:'🎨', md:'📄',
+                 json:'📋', sh:'⚙', txt:'📝'};
+  return icons[ext] || '·';
+}
+
+async function openFile(path) {
+  activeFile = path;
+  document.getElementById('active-file-label').textContent = path;
+  // Re-render tree to show active state
+  const res = await fetch('/api/files/tree');
+  const data = await res.json();
+  renderTree(data.tree || []);
+  // Read and display
+  try {
+    const r = await fetch('/api/execute', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({code: `import sys; sys.stdout.write(open('${path}', encoding='utf-8', errors='ignore').read())`, language: 'python'})
+    });
+    const d = await r.json();
+    const content = d.stdout || d.error || '';
+    showCode(content, path);
+    switchTab('code');
+  } catch(e) {}
+}
+
+// ── Code / Diff display ──────────────────────────────
+function showCode(content, path) {
+  const block = document.getElementById('code-block');
+  const ext = (path || '').split('.').pop();
+  block.className = langClass(ext);
+  block.textContent = content;
+  hljs.highlightElement(block);
+  document.getElementById('placeholder').style.display = 'none';
+  document.getElementById('code-view').classList.add('visible');
+}
+
+function showDiff(diffText) {
+  const view = document.getElementById('diff-view');
+  if (!diffText || !diffText.trim()) {
+    view.innerHTML = '<div style="color:var(--muted);font-size:0.78rem;padding:8px 0">No changes — working tree is clean.</div>';
+  } else {
+    view.innerHTML = diffText.split('\n').map(renderDiffLine).join('');
+  }
+  document.getElementById('placeholder').style.display = 'none';
+  view.classList.add('visible');
+  document.getElementById('code-view').classList.remove('visible');
+  switchTab('diff');
+}
+
+function renderDiffLine(line) {
+  let cls = 'diff-ctx';
+  if (line.startsWith('+') && !line.startsWith('+++')) cls = 'diff-add';
+  else if (line.startsWith('-') && !line.startsWith('---')) cls = 'diff-del';
+  else if (line.startsWith('@@')) cls = 'diff-hunk';
+  return `<div class="diff-line ${cls}">${escHtml(line)}</div>`;
+}
+
+function langClass(ext) {
+  const m = {py:'language-python', js:'language-javascript', ts:'language-typescript',
+             html:'language-html', css:'language-css', json:'language-json',
+             md:'language-markdown', sh:'language-bash'};
+  return m[ext] || 'language-plaintext';
+}
+
+function switchTab(tab) {
+  currentTab = tab;
+  document.getElementById('tab-diff').classList.toggle('active', tab === 'diff');
+  document.getElementById('tab-code').classList.toggle('active', tab === 'code');
+  document.getElementById('diff-view').classList.toggle('visible', tab === 'diff');
+  document.getElementById('code-view').classList.toggle('visible', tab === 'code');
+  if (tab === 'diff' && !document.getElementById('diff-view').innerHTML) {
+    document.getElementById('placeholder').style.display = 'flex';
+  } else {
+    document.getElementById('placeholder').style.display = 'none';
+  }
+}
+
+// ── Git actions ───────────────────────────────────────
+async function runGitDiff() {
+  termLog('Running git diff…', 'step');
+  const res = await fetch('/api/execute', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({code: 'git diff', language: 'bash'})
+  });
+  const d = await res.json();
+  showDiff(d.stdout || d.error || '');
+  termLog(d.ok ? 'git diff ok' : 'git diff failed', d.ok ? 'ok' : 'fail');
+}
+
+async function runGitDiffStaged() {
+  termLog('Running git diff --staged…', 'step');
+  const res = await fetch('/api/execute', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({code: 'git diff --staged', language: 'bash'})
+  });
+  const d = await res.json();
+  showDiff(d.stdout || d.error || '');
+  termLog(d.ok ? 'git diff --staged ok' : 'failed', d.ok ? 'ok' : 'fail');
+}
+
+function openApproveModal() {
+  document.getElementById('commit-modal').style.display = 'flex';
+  document.getElementById('commit-msg').focus();
+}
+function closeApproveModal() {
+  document.getElementById('commit-modal').style.display = 'none';
+}
+
+async function approveCommit() {
+  const msg = document.getElementById('commit-msg').value.trim();
+  if (!msg) { document.getElementById('commit-msg').focus(); return; }
+  closeApproveModal();
+  // Write gitapprove.json via server
+  termLog(`Requesting commit: "${msg}"`, 'step');
+  const writeRes = await fetch('/api/execute', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({
+      code: `import json, pathlib\np = pathlib.Path('pending_approvals/gitapprove.json')\np.parent.mkdir(exist_ok=True)\np.write_text(json.dumps({"approved": True, "message": "${msg.replace(/"/g,'\\\"')}"}))\nprint('approval written')`,
+      language: 'python'
+    })
+  });
+  const wd = await writeRes.json();
+  if (!wd.ok) { termLog('Could not write approval file', 'fail'); return; }
+  // Run commit via task action
+  const taskRes = await fetch('/api/tasks/create', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({goal: `Git commit: ${msg}`, agent: 'Clay Coder'})
+  });
+  // Simpler: use execute directly with gitcommit logic
+  const commitRes = await fetch('/api/execute', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({
+      code: `git add -A && git commit -m "${msg.replace(/"/g,'\\\"')}"`,
+      language: 'bash'
+    })
+  });
+  const cd = await commitRes.json();
+  termLog(cd.stdout || cd.stderr || cd.error || '', cd.ok ? 'result' : 'fail');
+  termLog(cd.ok ? `Committed: "${msg}"` : 'Commit failed', cd.ok ? 'ok' : 'fail');
+  if (cd.ok) {
+    // Clean up approval file
+    await fetch('/api/execute', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({
+        code: "import pathlib; p=pathlib.Path('pending_approvals/gitapprove.json'); p.unlink(missing_ok=True)",
+        language: 'python'
+      })
+    });
+  }
+}
+
+// ── Chat ──────────────────────────────────────────────
+function autoResize(el) {
+  el.style.height = 'auto';
+  el.style.height = Math.min(el.scrollHeight, 120) + 'px';
+}
+
+function handleKey(e) {
+  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }
+}
+
+async function sendMessage() {
+  const input = document.getElementById('chat-input');
+  const msg = input.value.trim();
+  if (!msg) return;
+  input.value = '';
+  input.style.height = 'auto';
+  document.getElementById('chat-send').disabled = true;
+
+  // Render user message and persist
+  _renderMsg('user', msg);
+  _saveToHistory('user', msg);
+  const msgs = document.getElementById('chat-messages');
+  msgs.scrollTop = msgs.scrollHeight;
+
+  // Context: include active file path if set
+  let prompt = msg;
+  if (activeFile) prompt = `[Active file: ${activeFile}]\n\n${msg}`;
+
+  // Show thinking bubble with bouncing dots + elapsed counter
+  showThinkingBubble();
+
+  let full = '';
+  let streamEl = null;
+
+  try {
+    console.log('[Clay Coder] POST /api/ask', {prompt: prompt.slice(0, 120)});
+    const res = await fetch('/api/ask', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({prompt})
+    });
+
+    console.log('[Clay Coder] response status:', res.status, res.statusText);
+
+    if (!res.ok) {
+      const errText = await res.text();
+      console.error('[Clay Coder] error body:', errText);
+      removeThinkingBubble();
+      _renderMsg('assistant', `Error ${res.status}: ${errText.slice(0, 200) || res.statusText}`);
+      document.getElementById('chat-send').disabled = false;
+      input.focus();
+      return;
+    }
+
+    // Replace thinking bubble with real streaming bubble
+    removeThinkingBubble();
+    const bubble = document.createElement('div');
+    bubble.className = 'msg assistant';
+    bubble.innerHTML = '<div class="role">clay coder</div><div class="bubble" id="streaming-bubble"></div>';
+    msgs.appendChild(bubble);
+    msgs.scrollTop = msgs.scrollHeight;
+    streamEl = document.getElementById('streaming-bubble');
+
+    const reader = res.body.getReader();
+    const dec = new TextDecoder();
+    let buf = '';
+    while (true) {
+      const {done, value} = await reader.read();
+      if (done) break;
+      buf += dec.decode(value, {stream: true});
+      const lines = buf.split('\n');
+      buf = lines.pop();
+      for (const line of lines) {
+        if (!line.trim()) continue;
+        try {
+          const d = JSON.parse(line);
+          console.log('[Clay Coder] chunk:', d);
+          if (d.response) {
+            full += d.response;
+            streamEl.textContent = full;
+            msgs.scrollTop = msgs.scrollHeight;
+          }
+        } catch(e) { console.warn('[Clay Coder] JSON parse fail:', line); }
+      }
+    }
+    // Flush remaining buffer
+    if (buf.trim()) {
+      try {
+        const d = JSON.parse(buf);
+        if (d.response) { full += d.response; streamEl.textContent = full; }
+      } catch(e) {}
+    }
+
+    if (!full) {
+      streamEl.textContent = '(no response — check that Ollama is running and Clay Coder agent is active)';
+      streamEl.style.color = 'var(--red)';
+    }
+
+  } catch(e) {
+    console.error('[Clay Coder] fetch error:', e);
+    removeThinkingBubble();
+    _renderMsg('assistant', `Fetch error: ${e.message} — is the server running?`);
+    streamEl = null;
+  }
+
+  if (streamEl) streamEl.id = '';
+  document.getElementById('chat-send').disabled = false;
+  input.focus();
+
+  if (full) _saveToHistory('assistant', full);
+
+  // If response contains a diff, render in center panel
+  if (full.includes('@@') || full.includes('---')) {
+    const m = full.match(/```diff\n([\s\S]+?)```/);
+    if (m) showDiff(m[1]);
+  }
+}
+
+function appendMsg(role, text) {
+  _renderMsg(role, text);
+  document.getElementById('chat-messages').scrollTop = 99999;
+}
+
+// ── Terminal ──────────────────────────────────────────
+function termLog(msg, type) {
+  const out = document.getElementById('terminal-output');
+  const el = document.createElement('div');
+  const prefix = type === 'ok' ? '✓ ' : type === 'fail' ? '✗ ' : type === 'step' ? '→ ' : '  ';
+  el.className = `term-${type || 'result'}`;
+  el.textContent = prefix + msg;
+  out.appendChild(el);
+  out.scrollTop = out.scrollHeight;
+}
+
+function clearTerminal() {
+  document.getElementById('terminal-output').innerHTML = '';
+}
+
+async function pollActiveTask() {
+  try {
+    const res = await fetch('/api/tasks');
+    const data = await res.json();
+    const active = data.active;
+    const dot = document.getElementById('task-status-dot');
+    const label = document.getElementById('task-label');
+    if (active) {
+      dot.className = 'running';
+      label.textContent = `${active.goal} · step ${active.step}`;
+      if (active.current_step) termLog(active.current_step, 'step');
+    } else {
+      // Check last completed task
+      const last = (data.tasks || [])[0];
+      if (last) {
+        dot.className = last.status === 'complete' ? 'complete' : last.status === 'failed' ? 'failed' : '';
+        label.textContent = last.status === 'complete' ? `done: ${last.goal}` : '';
+      } else {
+        dot.className = '';
+        label.textContent = '';
+      }
+    }
+  } catch(e) {}
+}
+
+// ── Commit modal close on backdrop ───────────────────
+document.getElementById('commit-modal').addEventListener('click', function(e) {
+  if (e.target === this) closeApproveModal();
+});
+
+// ── Util ──────────────────────────────────────────────
+function escHtml(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+</script>
+</body>
+</html>

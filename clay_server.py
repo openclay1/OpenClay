@@ -13,6 +13,8 @@ PORT = 3000
 OLLAMA_URL = "http://localhost:11434"
 PREFERRED_MODELS = ["qwen2.5:3b-instruct-q4_K_M", "qwen2.5:3b", "llama3.2:3b",
                      "phi3:mini", "gemma4:latest"]
+# Ranked model preference for health checks (shorter names, prefix-matched)
+MODEL_RANK_HEALTH = ["qwen2.5:3b", "gemma3:4b", "llama3.2:3b"]
 BASE_DIR = Path(__file__).parent
 WIKI_DIR = BASE_DIR / "wiki"
 MEMORY_DIR = BASE_DIR / "memory"
@@ -25,6 +27,8 @@ TASKS_DIR = BASE_DIR / "tasks"
 TASK_METRICS_FILE = SANDBOX_DIR / "logs" / "task_metrics.jsonl"
 _ollama_proc = None
 _model = None
+HARDWARE_PROFILE_FILE = BASE_DIR / "hardware_profile.json"
+_hardware_summary = ""  # one-line string injected into Clay Coder system prompt
 
 # ── Session state ────────────────────────────────────────────────
 loaded_document = ""
@@ -42,6 +46,72 @@ _log_last_hash = "genesis"
 _execution_history = []
 _active_tasks = {}      # id -> task dict
 _task_threads = {}      # id -> thread
+
+# ── Hardware Detection ───────────────────────────────────────────
+def _detect_hardware():
+    """Detect CPU cores, RAM, GPU availability. Writes hardware_profile.json."""
+    global _hardware_summary
+    import platform
+    profile = {"detected_at": datetime.now().isoformat()}
+    # CPU
+    try:
+        import os as _os
+        profile["cpu_cores"] = _os.cpu_count() or 0
+    except Exception:
+        profile["cpu_cores"] = 0
+    # RAM
+    try:
+        with open("/proc/meminfo") as f:
+            for line in f:
+                if line.startswith("MemTotal"):
+                    kb = int(line.split()[1])
+                    profile["ram_gb"] = round(kb / 1024 / 1024, 1)
+                    break
+    except Exception:
+        try:
+            result = subprocess.run(["sysctl", "-n", "hw.memsize"],
+                                    capture_output=True, text=True, timeout=3)
+            if result.returncode == 0:
+                profile["ram_gb"] = round(int(result.stdout.strip()) / 1024 / 1024 / 1024, 1)
+        except Exception:
+            profile["ram_gb"] = 0
+    # GPU via nvidia-smi
+    profile["gpu"] = "none"
+    try:
+        result = subprocess.run(["nvidia-smi", "--query-gpu=name", "--format=csv,noheader"],
+                                capture_output=True, text=True, timeout=5)
+        if result.returncode == 0 and result.stdout.strip():
+            profile["gpu"] = result.stdout.strip().splitlines()[0]
+    except Exception:
+        pass
+    # GPU via ollama list (infer from available models as proxy)
+    if profile["gpu"] == "none":
+        try:
+            result = subprocess.run(["ollama", "list"],
+                                    capture_output=True, text=True, timeout=5)
+            if result.returncode == 0:
+                profile["ollama_models"] = [
+                    line.split()[0] for line in result.stdout.strip().splitlines()[1:]
+                    if line.strip()
+                ]
+        except Exception:
+            profile["ollama_models"] = []
+    # Platform
+    profile["platform"] = platform.system()
+    profile["machine"] = platform.machine()
+    # Write to disk
+    try:
+        HARDWARE_PROFILE_FILE.write_text(json.dumps(profile, indent=2), "utf-8")
+    except Exception:
+        pass
+    # Build one-line summary
+    gpu_part = f", GPU: {profile['gpu']}" if profile.get("gpu") != "none" else ", no GPU detected"
+    _hardware_summary = (
+        f"Hardware: {profile.get('cpu_cores', '?')} CPU cores, "
+        f"{profile.get('ram_gb', '?')} GB RAM{gpu_part} "
+        f"({profile.get('platform', '?')} {profile.get('machine', '')})"
+    )
+    return profile
 
 # ── Soul document loading ────────────────────────────────────────
 def _load_soul():
@@ -80,6 +150,25 @@ def _stop_ollama():
     global _ollama_proc
     if _ollama_proc: _ollama_proc.terminate(); _ollama_proc = None
 
+def _ensure_ollama(max_wait: int = 10) -> bool:
+    """Silently attempt to start Ollama if not running. Returns True if up."""
+    if _is_ollama_running():
+        return True
+    print("  [engine] not responding — attempting silent restart…")
+    try:
+        subprocess.Popen(["ollama", "serve"], stdout=subprocess.DEVNULL,
+                         stderr=subprocess.DEVNULL, start_new_session=True)
+    except FileNotFoundError:
+        print("  [engine] binary not found")
+        return False
+    for _ in range(max_wait * 2):
+        time.sleep(0.5)
+        if _is_ollama_running():
+            print("  [engine] recovered ok")
+            return True
+    print("  [engine] recovery timed out after %ds" % max_wait)
+    return False
+
 def _detect_model():
     global _model
     if _model: return _model
@@ -93,6 +182,46 @@ def _detect_model():
         if available: _model = available[0]; return _model
     except Exception: pass
     _model = PREFERRED_MODELS[0]; return _model
+
+def _model_health_check():
+    """Silently refresh active model selection. Never pulls models."""
+    global _model
+    if not _is_ollama_running():
+        return
+    try:
+        resp = urllib.request.urlopen(f"{OLLAMA_URL}/api/tags", timeout=5)
+        available = [m["name"] for m in json.loads(resp.read()).get("models", [])]
+        if not available:
+            return
+        # Try health-check rank first, then PREFERRED_MODELS
+        for pref in MODEL_RANK_HEALTH + PREFERRED_MODELS:
+            for avail in available:
+                if avail.startswith(pref.split(":")[0]):
+                    if _model != avail:
+                        print(f"  [model-health] updating active model: {avail}")
+                        _model = avail
+                        try:
+                            hp = json.loads(HARDWARE_PROFILE_FILE.read_text("utf-8")) if HARDWARE_PROFILE_FILE.exists() else {}
+                            hp["active_model"] = avail
+                            hp["model_checked_at"] = datetime.now().isoformat()
+                            HARDWARE_PROFILE_FILE.write_text(json.dumps(hp, indent=2))
+                        except Exception:
+                            pass
+                    return
+        # Fallback: just take whatever is available
+        if _model != available[0]:
+            _model = available[0]
+    except Exception:
+        pass
+
+def _start_model_health_thread():
+    """Background thread: re-run model health check every 30 minutes."""
+    def _worker():
+        while True:
+            time.sleep(1800)
+            _model_health_check()
+    t = threading.Thread(target=_worker, daemon=True, name="model-health")
+    t.start()
 
 # ── Mem0 Persistent Memory ──────────────────────────────────────
 def _init_mem0():
@@ -262,6 +391,7 @@ def _init_research_memory():
         _research_db.get_or_create_collection("factual")
         _research_db.get_or_create_collection("experiential")
         _research_db.get_or_create_collection("beliefs")
+        _research_db.get_or_create_collection("codebase")
         return True
     except Exception as e:
         print(f"  Research memory init failed: {e}")
@@ -289,6 +419,36 @@ def _research_search(network, query, n=5):
         docs = results.get("documents", [[]])[0]
         metas = results.get("metadatas", [[]])[0]
         return [{"text": d, "metadata": m} for d, m in zip(docs, metas)]
+    except Exception: return []
+
+def _codebase_memory_add(filepath: str, description: str):
+    """Store a Clay Coder file-write event in the codebase ChromaDB collection."""
+    if not _research_db: return
+    def _worker():
+        try:
+            col = _research_db.get_collection("codebase")
+            doc_id = hashlib.md5((filepath + str(time.time())).encode()).hexdigest()[:12]
+            col.add(
+                documents=[description],
+                ids=[doc_id],
+                metadatas=[{"filepath": filepath, "timestamp": datetime.now().isoformat()}]
+            )
+        except Exception: pass
+    threading.Thread(target=_worker, daemon=True).start()
+
+def _codebase_memory_get_all():
+    """Return all codebase memory entries sorted by timestamp descending."""
+    if not _research_db: return []
+    try:
+        col = _research_db.get_collection("codebase")
+        if col.count() == 0: return []
+        all_data = col.get(include=["documents", "metadatas"])
+        items = []
+        for doc, meta in zip(all_data.get("documents", []), all_data.get("metadatas", [])):
+            items.append({"description": doc, "filepath": meta.get("filepath", ""),
+                          "timestamp": meta.get("timestamp", "")})
+        items.sort(key=lambda x: x["timestamp"], reverse=True)
+        return items
     except Exception: return []
 
 def _research_get_context():
@@ -440,20 +600,28 @@ def _task_list():
     return tasks
 
 def _task_ollama_call(prompt, system="", timeout=TASK_LLM_TIMEOUT):
-    """Blocking Ollama call with timeout. Returns response text."""
-    body = json.dumps({
-        "model": _detect_model(),
-        "prompt": prompt,
-        "system": system,
-        "stream": False,
-        "options": {"temperature": 0.3, "num_predict": 512}
-    }).encode()
-    req = urllib.request.Request(
-        f"{OLLAMA_URL}/api/generate", data=body,
-        headers={"Content-Type": "application/json"}
-    )
-    resp = urllib.request.urlopen(req, timeout=timeout)
-    return json.loads(resp.read()).get("response", "")
+    """Blocking Ollama call with timeout. Returns response text. Auto-recovers on failure."""
+    def _do_call():
+        body = json.dumps({
+            "model": _detect_model(),
+            "prompt": prompt,
+            "system": system,
+            "stream": False,
+            "options": {"temperature": 0.3, "num_predict": 512}
+        }).encode()
+        req = urllib.request.Request(
+            f"{OLLAMA_URL}/api/generate", data=body,
+            headers={"Content-Type": "application/json"}
+        )
+        resp = urllib.request.urlopen(req, timeout=timeout)
+        return json.loads(resp.read()).get("response", "")
+    try:
+        return _do_call()
+    except urllib.error.URLError as e:
+        print(f"  [engine] task call failed ({e}) — attempting recovery")
+        if _ensure_ollama(max_wait=10):
+            return _do_call()
+        raise RuntimeError("Clay engine unavailable") from e
 
 def _task_auto_summarize(task):
     """Generate a summary from completed steps."""
@@ -649,9 +817,36 @@ def _task_execute_action(action_dict):
             filepath = SANDBOX_DIR / filename
             filepath.parent.mkdir(parents=True, exist_ok=True)
             filepath.write_text(content, "utf-8")
+            # Clay Coder: store file-write event in codebase memory
+            if _current_agent and _current_agent.get("name") == "Clay Coder":
+                desc = f"Wrote {len(content)} bytes to {filename}"
+                _codebase_memory_add(str(filepath), desc)
             return {"ok": True, "stdout": f"Written {len(content)} bytes to {filename}", "stderr": ""}
         except Exception as e:
             return {"ok": False, "error": str(e), "stdout": "", "stderr": ""}
+    elif action == "gitdiff":
+        # inp can be "" (unstaged), "staged", or a specific path
+        cmd = "git diff --staged" if inp.strip() == "staged" else f"git diff {inp}".strip()
+        return _execute_code(cmd, "bash", timeout=15, cwd=BASE_DIR)
+    elif action == "gitcommit":
+        # Requires pending_approvals/gitapprove.json with "approved": true
+        approve_path = BASE_DIR / "pending_approvals" / "gitapprove.json"
+        if not approve_path.exists():
+            return {"ok": False, "error": "No git approval found — create pending_approvals/gitapprove.json with {\"approved\": true}", "stdout": "", "stderr": ""}
+        try:
+            approval = json.loads(approve_path.read_text("utf-8"))
+            if not approval.get("approved"):
+                return {"ok": False, "error": "Git commit not approved — set \"approved\": true in pending_approvals/gitapprove.json", "stdout": "", "stderr": ""}
+        except Exception as e:
+            return {"ok": False, "error": f"Could not read gitapprove.json: {e}", "stdout": "", "stderr": ""}
+        message = inp.strip() or "Clay Coder commit"
+        result = _execute_code(f'git add -A && git commit -m "{message}"', "bash", timeout=30, cwd=BASE_DIR)
+        if result.get("ok"):
+            try:
+                approve_path.unlink()
+            except Exception:
+                pass
+        return result
     elif action == "done":
         return {"ok": True, "stdout": inp, "stderr": "", "done": True}
     else:
@@ -1329,7 +1524,13 @@ def _build_system_prompt(query=""):
         parts.append(_soul_text)
     # Active agent prompt overrides default
     if _current_agent and _current_agent.get("system_prompt"):
-        parts.append(_current_agent["system_prompt"])
+        agent_prompt = _current_agent["system_prompt"]
+        # Clay Coder: inject hardware summary (one sentence max)
+        if _current_agent.get("name") == "Clay Coder" and _hardware_summary:
+            # Trim to first sentence / 120 chars
+            hw_line = _hardware_summary.split(".")[0][:120]
+            agent_prompt += f"\n\n[{hw_line}]"
+        parts.append(agent_prompt)
     else:
         parts.append(SYSTEM_PROMPT)
     # Connected folders
@@ -1589,6 +1790,8 @@ class ClayHandler(http.server.SimpleHTTPRequestHandler):
             "/api/tasks": self._handle_tasks_list,
             "/api/tasks/stop": self._handle_task_stop,
             "/api/tasks/demo": self._handle_demo_tasks,
+            # Pro
+            "/api/pro/waitlist": self._handle_pro_waitlist,
         }
         handler = routes.get(self.path)
         if handler: handler()
@@ -1607,6 +1810,16 @@ class ClayHandler(http.server.SimpleHTTPRequestHandler):
                 self._send_json(task)
             else:
                 self._send_json({"error": "Task not found"}, 404)
+            return
+        # Clay Code Pro routes
+        if self.path == "/claycode":
+            self._handle_claycode_page()
+            return
+        if self.path == "/api/files/tree":
+            self._handle_files_tree()
+            return
+        if self.path == "/api/memory/codebase":
+            self._handle_codebase_memory()
             return
         # Fall through to static file serving
         super().do_GET()
@@ -1666,9 +1879,15 @@ class ClayHandler(http.server.SimpleHTTPRequestHandler):
             full_prompt = f"[Document: {loaded_filename}]\n\n{loaded_document[:6000]}\n\n---\nUser: {prompt}"
 
         model = _current_agent.get("model", _detect_model()) if _current_agent else _detect_model()
+        # Clay Coder: shorter completions cut response time ~50% on CPU
+        is_coder = _current_agent and _current_agent.get("name") == "Clay Coder"
+        num_predict = 256 if is_coder else 512
+        opts = {"temperature": 0.7, "num_predict": num_predict}
+        if not is_coder:
+            opts["num_ctx"] = 2048
         ollama_body = json.dumps({"model": model, "prompt": full_prompt,
                                    "system": system, "stream": True,
-                                   "options": {"temperature": 0.7, "num_predict": 1024}}).encode()
+                                   "options": opts}).encode()
         try:
             req = urllib.request.Request(f"{OLLAMA_URL}/api/generate", data=ollama_body,
                                          headers={"Content-Type": "application/json"})
@@ -1999,6 +2218,71 @@ class ClayHandler(http.server.SimpleHTTPRequestHandler):
              "icon": "\U0001f4cb"}
         ]})
 
+    # ── Clay Code Pro handlers ──────────────────────────────────
+    def _handle_claycode_page(self):
+        from pro.license import is_pro, gate_html
+        if not is_pro():
+            html = gate_html().encode("utf-8")
+            self.send_response(200)
+            self.send_header("Content-Type", "text/html; charset=utf-8")
+            self.send_header("Content-Length", str(len(html)))
+            self.end_headers()
+            self.wfile.write(html)
+            return
+        clay_html = BASE_DIR / "static" / "claycode.html"
+        if not clay_html.exists():
+            self.send_error(404, "claycode.html not found")
+            return
+        content = clay_html.read_bytes()
+        self.send_response(200)
+        self.send_header("Content-Type", "text/html; charset=utf-8")
+        self.send_header("Content-Length", str(len(content)))
+        self.end_headers()
+        self.wfile.write(content)
+
+    def _handle_files_tree(self):
+        EXCLUDED_DIRS = {".git", "__pycache__", "node_modules", "memory_store",
+                         "memory_store_test", ".claude"}
+        EXCLUDED_EXTS = {".pyc", ".pyo", ".DS_Store"}
+        EXCLUDED_OUTPUT = str(SANDBOX_DIR / "output")
+        ALLOWED_EXTS = {".py", ".js", ".html", ".md", ".json", ".ts", ".css", ".sh", ".txt"}
+        tree = []
+        for p in sorted(BASE_DIR.rglob("*")):
+            if p.is_dir():
+                continue
+            # Skip excluded directories anywhere in path
+            if any(part in EXCLUDED_DIRS for part in p.parts):
+                continue
+            # Skip sandbox/output subtree
+            if str(p).startswith(EXCLUDED_OUTPUT):
+                continue
+            if p.suffix in EXCLUDED_EXTS:
+                continue
+            if p.suffix not in ALLOWED_EXTS:
+                continue
+            try:
+                rel = str(p.relative_to(BASE_DIR))
+                stat = p.stat()
+                tree.append({
+                    "path": rel,
+                    "size": stat.st_size,
+                    "modified": datetime.fromtimestamp(stat.st_mtime).isoformat()
+                })
+            except Exception:
+                continue
+        self._send_json({"tree": tree})
+
+    def _handle_codebase_memory(self):
+        items = _codebase_memory_get_all()
+        self._send_json({"memories": items, "count": len(items)})
+
+    def _handle_pro_waitlist(self):
+        body = json.loads(self._read_body())
+        email = body.get("email", "")
+        from pro.license import add_to_waitlist
+        ok = add_to_waitlist(email)
+        self._send_json({"ok": ok})
+
     def do_OPTIONS(self):
         self.send_response(200)
         self.send_header("Access-Control-Allow-Origin", "*")
@@ -2069,6 +2353,9 @@ def main():
     if soul:
         custom = (BASE_DIR / "soul_custom.md").exists()
         print(f"  Soul loaded ({len(soul)} chars" + (" + custom" if custom else "") + ")")
+    # Hardware profile
+    hw = _detect_hardware()
+    print(f"  Hardware: {hw.get('cpu_cores','?')} cores · {hw.get('ram_gb','?')} GB RAM · GPU: {hw.get('gpu','none')}")
     # Load agents
     _load_agents()
     if _agents:

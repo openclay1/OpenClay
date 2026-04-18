@@ -1,0 +1,14 @@
+{
+  "detected_at": "2026-04-18T12:31:57.681339",
+  "cpu_cores": 8,
+  "ram_gb": 16.0,
+  "gpu": "none",
+  "ollama_models": [
+    "qwen2.5:3b-instruct-q4_K_M",
+    "qwen2.5:0.5b",
+    "glm-5.1:cloud",
+    "gemma4:latest"
+  ],
+  "platform": "Darwin",
+  "machine": "x86_64"
+}

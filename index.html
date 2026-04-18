@@ -65,8 +65,39 @@
     #status-bar { position: fixed; bottom: 80px; left: 50%; transform: translateX(-50%);
       z-index: 10; text-align: center; pointer-events: none; width: 90vw; }
     #status-bar p { font-size: 0.6rem; color: var(--faint); letter-spacing: 0.04em; line-height: 1.5; }
+    #memory-status {
+      background: none; border: 1px solid transparent; border-radius: 9999px;
+      font-family: inherit; font-size: 0.6rem; color: var(--faint);
+      letter-spacing: 0.04em; padding: 2px 10px; cursor: pointer;
+      transition: border-color 150ms, color 150ms; pointer-events: all;
+    }
+    #memory-status:hover { border-color: var(--agent-color); color: var(--agent-color); }
     /* Settings panel */
     #settings-btn { position: fixed; top: 20px; right: 20px; z-index: 20; }
+    /* History button + panel */
+    #history-btn { position: fixed; top: 20px; right: 94px; z-index: 20; }
+    #history-overlay { display: none; position: fixed; inset: 0; z-index: 29; }
+    #history-overlay.open { display: block; }
+    #history-panel { position: fixed; top: 60px; right: 20px; width: 320px; max-height: 420px;
+      background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-xl);
+      box-shadow: var(--shadow-md); z-index: 30; display: none; flex-direction: column;
+      overflow: hidden; }
+    #history-panel.open { display: flex; }
+    #history-panel-header { padding: 10px 14px; border-bottom: 1px solid var(--border);
+      font-size: 0.68rem; color: var(--muted); letter-spacing: 0.06em; text-transform: uppercase; }
+    #history-list { overflow-y: auto; flex: 1; padding: 6px 0; }
+    .history-item { padding: 8px 14px; cursor: pointer; border-bottom: 1px solid var(--border);
+      transition: background 120ms; }
+    .history-item:last-child { border-bottom: none; }
+    .history-item:hover { background: var(--surface-offset); }
+    .history-item .hi-time { font-size: 0.6rem; color: var(--faint); margin-bottom: 2px; }
+    .history-item .hi-text { font-size: 0.72rem; color: var(--text);
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    /* Mic status dot */
+    #mic-dot { width: 6px; height: 6px; border-radius: 50%; background: #c0392b;
+      position: absolute; top: 6px; right: 6px; display: none; }
+    #mic-btn { position: relative; }
+    #mic-btn.recording #mic-dot { display: block; animation: pulse-rec 1.2s infinite; }
     #settings-panel { position: fixed; top: 0; right: -400px; width: 380px; height: 100%;
       background: var(--surface); border-left: 1px solid var(--border); z-index: 30;
       transition: right 250ms cubic-bezier(0.16,1,0.3,1); overflow-y: auto; }
@@ -264,6 +295,12 @@
       text-align: center; padding: 4px 0 5px;
       font-size: 0.57rem; color: var(--faint); letter-spacing: 0.07em;
       pointer-events: none; }
+    /* Clay Code button */
+    #clay-code-btn { position: fixed; top: 20px; right: 56px; z-index: 20;
+      background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-full);
+      padding: 5px 12px; font-family: inherit; font-size: 0.68rem; font-weight: 600;
+      color: #00FF9C; cursor: pointer; transition: all var(--transition); letter-spacing: 0.03em; }
+    #clay-code-btn:hover { background: rgba(0,255,156,0.08); border-color: #00FF9C; }
     /* Demo Mode toggle */
     #demo-mode-btn { position: fixed; top: 20px; left: 20px; z-index: 20;
       background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-full);
@@ -291,7 +328,14 @@
   <div id="title"><h1>OpenClay</h1><p>COANA LABS &middot; LOCAL &middot; PRIVADO &middot; TUYO</p></div>
   <button id="demo-mode-btn" onclick="toggleDemoMode()" title="Demo Mode — smooth animations for screen recording">&#127916; Demo</button>
   <div id="rec-indicator"><span class="rec-dot"></span>REC</div>
+  <button id="clay-code-btn" onclick="window.location='/claycode'" title="Clay Code — OpenClay Pro">&#60;/&#62;</button>
+  <button class="btn-icon" id="history-btn" onclick="toggleHistory()" title="Session history">&#128336;</button>
   <button class="btn-icon" id="settings-btn" onclick="toggleSettings()">&#9881;</button>
+  <div id="history-overlay" onclick="toggleHistory()"></div>
+  <div id="history-panel">
+    <div id="history-panel-header">Session History</div>
+    <div id="history-list"><div style="padding:12px 14px;font-size:0.72rem;color:var(--faint)">Loading…</div></div>
+  </div>
   <div id="settings-overlay" onclick="toggleSettings()"></div>
   <div id="settings-panel">
     <div class="settings-inner">
@@ -398,7 +442,7 @@
   <div id="canvas-container"></div>
   <div id="status-bar">
     <p id="privacy-text">100% local &middot; nada sale de tu computadora</p>
-    <p id="memory-status"></p>
+    <button id="memory-status" onclick="cycleAgent()" title="Click to switch agent"></button>
   </div>
   <div id="task-progress">
     <span class="tp-dot"></span>
@@ -408,7 +452,7 @@
   <div id="disclaimer"></div>
   <div id="controls">
     <div id="input-row">
-      <button class="btn-icon" id="mic-btn" onclick="toggleMic()" title="Voice input">&#127908;</button>
+      <button class="btn-icon" id="mic-btn" onclick="toggleMic()" title="Voice input">&#127908;<span id="mic-dot"></span></button>
       <button class="btn-icon" id="clip-btn" onclick="openFilePicker()" title="Upload PDF/TXT">&#128206;</button>
       <input type="text" id="clay-input" placeholder="Pregunta algo... / Ask anything..." autocomplete="off">
       <button id="clay-send" onclick="handleSend()">Enviar</button>
@@ -481,13 +525,19 @@
           toggleMic(); // retry with next language
           return;
         }
-        const msgs = {
+        const errMsgs = {
           'no-speech': 'No escuch\u00E9 nada',
           'audio-capture': 'Sin micr\u00F3fono',
-          'not-allowed': 'Permiso denegado \u2014 habilita el mic en el navegador',
+          'not-allowed': 'Mic access blocked \u2014 check browser permissions',
           'network': 'Sin conexi\u00F3n de red'
         };
-        const msg = msgs[e.error] || ('Error: ' + e.error);
+        const msg = errMsgs[e.error] || ('Error: ' + e.error);
+        if (e.error === 'not-allowed') {
+          const inp = document.getElementById('clay-input');
+          const orig = inp.placeholder;
+          inp.placeholder = 'Mic access blocked \u2014 check browser permissions';
+          setTimeout(() => { inp.placeholder = orig; }, 5000);
+        }
         showBadge('voice', '\u26A0 ' + msg, true);
         setTimeout(() => removeBadge('voice'), 4000);
         setAppState('idle');
@@ -510,25 +560,27 @@
 
     // ═══ Mic ═══
     function toggleMic(){
-      if(!recognition){
+      if(!SpeechRecognitionAPI){
         document.getElementById('mic-btn').setAttribute('title','Voice requires Chrome or Safari');
         showBadge('voice','\u26A0 Voice requires Chrome or Safari',true);
         setTimeout(()=>removeBadge('voice'),4000);
         return;
       }
       if(appState==='listening'){
-        try{recognition.stop();}catch(e){}
+        try{recognition&&recognition.stop();}catch(e){}
         setAppState('idle');
         removeBadge('voice');
         return;
       }
+      // Always build a fresh recognition object — avoids stale state after navigation
+      voiceLangIdx = 0;
+      recognition = _buildRecognition();
       if(appState==='speaking') window.speechSynthesis.cancel();
       setAppState('listening');
       showBadge('voice','\uD83C\uDF99 Escuchando\u2026',false);
       try {
         recognition.start();
       } catch(e) {
-        // If already started, abort and restart
         try { recognition.abort(); } catch(e2) {}
         setTimeout(() => {
           recognition = _buildRecognition();
@@ -582,6 +634,46 @@
     }
     function removeBadge(id){const e=document.getElementById('badge-'+id);if(e)e.remove();}
 
+    // ═══ Session History ═══
+    let historyOpen = false;
+    function toggleHistory(){
+      historyOpen = !historyOpen;
+      document.getElementById('history-panel').classList.toggle('open', historyOpen);
+      document.getElementById('history-overlay').classList.toggle('open', historyOpen);
+      if (historyOpen) loadSessionHistory();
+    }
+    async function loadSessionHistory(){
+      const list = document.getElementById('history-list');
+      try {
+        const res = await fetch('/api/logs', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({})
+        });
+        const data = await res.json();
+        const entries = (data.entries || []).filter(e => e.role === 'user').slice(-10).reverse();
+        if (!entries.length) {
+          list.innerHTML = '<div style="padding:12px 14px;font-size:0.72rem;color:var(--faint)">No conversation history today.</div>';
+          return;
+        }
+        list.innerHTML = entries.map(e => {
+          const ts = (e.timestamp||'').slice(0,16).replace('T',' ');
+          const text = (e.content||'').slice(0,60) + ((e.content||'').length > 60 ? '…' : '');
+          return `<div class="history-item" onclick="restoreFromHistory(${JSON.stringify(e.content||'').replace(/</g,'&lt;')})">
+            <div class="hi-time">${ts}</div>
+            <div class="hi-text">${text.replace(/</g,'&lt;').replace(/>/g,'&gt;')}</div>
+          </div>`;
+        }).join('');
+      } catch(err) {
+        list.innerHTML = '<div style="padding:12px 14px;font-size:0.72rem;color:var(--faint)">Could not load history.</div>';
+      }
+    }
+    function restoreFromHistory(text){
+      document.getElementById('clay-input').value = text;
+      document.getElementById('clay-input').focus();
+      toggleHistory();
+    }
+
     // ═══ Settings ═══
     function toggleSettings(){
       settingsOpen=!settingsOpen;
@@ -611,6 +703,21 @@
         });
       }catch(e){}
     }
+    const _AGENT_CYCLE = [
+      {name:'Clay General',   color:'#e06438'},
+      {name:'Clay Investigador', color:'#7C3AED'},
+      {name:'Clay Clínico',   color:'#0891B2'},
+      {name:'Clay Explorer',  color:'#059669'},
+      {name:'Clay Coder',     color:'#00FF9C'},
+    ];
+    let _agentCycleIdx = 0;
+
+    async function cycleAgent(){
+      _agentCycleIdx = (_agentCycleIdx + 1) % _AGENT_CYCLE.length;
+      const next = _AGENT_CYCLE[_agentCycleIdx];
+      await selectAgent(next.name);
+    }
+
     async function selectAgent(name){
       try{
         const r=await fetch('/api/agents/select',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name})});
@@ -893,8 +1000,12 @@
         if(d.wiki_pages>0) parts.push('\uD83D\uDCAD wiki: '+d.wiki_pages);
         if(d.memory_count>0) parts.push('\uD83E\udDE0 '+d.memory_count+' memories');
         if(d.log_entries>0) parts.push('\uD83D\uDCDD '+d.log_entries+' log');
-        parts.push(d.agent||'Clay General');
+        const agentName=d.agent||'Clay General';
+        parts.push(agentName);
         el.textContent=parts.join(' \u00B7 ');
+        el.title='Active: '+agentName+' — click to switch';
+        const _cidx=_AGENT_CYCLE.findIndex(a=>a.name===agentName);
+        if(_cidx>=0) _agentCycleIdx=_cidx;
         showBadge('mode',d.agent||'modo simple',false);
         if(d.color_accent&&d.color_accent!==currentAgentColor) setAgentColor(d.color_accent);
         if(d.new_ingested>0) showBadge('ingested','Le\u00ED '+d.new_ingested+' archivos',true);

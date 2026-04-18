@@ -1,32 +1,38 @@
 [
   {
-    "name": "NSF SBIR Phase I",
-    "url": "https://www.nsf.gov/eng/iip/sbir/",
-    "deadline": "rolling",
-    "focus": "AI, software, research tools, small business innovation"
+    "name": "PRSTRT SBIR/STTR Matching Grant",
+    "url": "https://prsciencetrust.org/sbir-sttr/",
+    "deadline": "Rolling",
+    "amount": "$100K-$200K matching",
+    "focus": "Technology-oriented small business in Puerto Rico receiving federal SBIR/STTR"
   },
   {
-    "name": "NIH STRIDES",
-    "url": "https://datascience.nih.gov/strides",
-    "deadline": "rolling",
-    "focus": "biomedical data science, AI, local and cloud compute, privacy in healthcare"
+    "name": "PRSTRT Catalyzer Research Grants 2026",
+    "url": "https://prsciencetrust.org/research-grants-program/",
+    "deadline": "2026 RFP open",
+    "amount": "Up to $100K",
+    "focus": "Life sciences, AI, biotech innovation in Puerto Rico"
   },
   {
-    "name": "PR Science Trust",
-    "url": "https://prst.pr.gov",
-    "deadline": "varies",
-    "focus": "Puerto Rico technology, science, innovation, community resilience"
+    "name": "NSF EPSCoR Research Infrastructure Improvement",
+    "url": "https://www.nsf.gov/funding/pgm_summ.jsp?pims_id=504724",
+    "deadline": "Check NSF portal",
+    "amount": "$3M-$20M",
+    "focus": "STEM research infrastructure in EPSCoR-eligible territories including Puerto Rico"
   },
   {
-    "name": "Foresight Institute",
-    "url": "https://foresight.org/grants/",
-    "deadline": "rolling",
-    "focus": "AI safety, beneficial technology, technical research for long-term benefit"
+    "name": "DOE EPSCoR State-National Lab Partnerships",
+    "url": "https://www.isotopes.gov/node/1541",
+    "deadline": "Pre-application required",
+    "amount": "$35M total pool",
+    "focus": "Energy research partnerships between EPSCoR states and DOE national labs"
   },
   {
-    "name": "EDA Build to Scale",
-    "url": "https://eda.gov/programs/build-to-scale",
-    "deadline": "annual",
-    "focus": "regional innovation ecosystems, technology startups, economic resilience"
+    "name": "PRSTRT BioLeap Life Sciences Accelerator",
+    "url": "https://www.eda.gov/funding/programs/build-to-scale/past-grantees/2023-venture-challenge/Puerto-Rico-Science-Technology-and-Research-Trust",
+    "deadline": "Rolling cohorts",
+    "amount": "Equity-free acceleration + follow-on",
+    "focus": "AI-driven medical technologies, biotechnology, genomics — Puerto Rico",
+    "notes": "needs manual verification — URL returned 403 during automated check (2026-04-17)"
   }
 ]
