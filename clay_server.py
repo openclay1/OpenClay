@@ -24,6 +24,7 @@ LOGS_DIR = BASE_DIR / "logs"
 SANDBOX_DIR = BASE_DIR / "sandbox"
 MEMORY_STORE_DIR = BASE_DIR / "memory_store"
 TASKS_DIR = BASE_DIR / "tasks"
+PROJECTS_DIR = BASE_DIR / "projects"
 TASK_METRICS_FILE = SANDBOX_DIR / "logs" / "task_metrics.jsonl"
 _ollama_proc = None
 _model = None
@@ -99,6 +100,16 @@ def _detect_hardware():
     # Platform
     profile["platform"] = platform.system()
     profile["machine"] = platform.machine()
+    # Estimated response time for 3B model
+    machine_lower = profile["machine"].lower()
+    is_apple_silicon = profile["platform"] == "Darwin" and machine_lower in ("arm64", "arm")
+    has_gpu = profile.get("gpu", "none") != "none"
+    if has_gpu:
+        profile["estimated_response_time"] = "2–5 seconds"
+    elif is_apple_silicon:
+        profile["estimated_response_time"] = "3–8 seconds"
+    else:
+        profile["estimated_response_time"] = "20–40 seconds"
     # Write to disk
     try:
         HARDWARE_PROFILE_FILE.write_text(json.dumps(profile, indent=2), "utf-8")
@@ -359,13 +370,15 @@ def _init_log_chain():
 def _load_agents():
     global _agents, _current_agent
     _agents = {}
-    if not AGENTS_DIR.exists(): return
-    for f in AGENTS_DIR.glob("*.agent.json"):
-        try:
-            cfg = json.loads(f.read_text("utf-8"))
-            name = cfg.get("name", f.stem)
-            _agents[name] = cfg
-        except Exception: pass
+    dirs_to_scan = [AGENTS_DIR, BASE_DIR / "pro" / "agents"]
+    for scan_dir in dirs_to_scan:
+        if not scan_dir.exists(): continue
+        for f in scan_dir.glob("*.agent.json"):
+            try:
+                cfg = json.loads(f.read_text("utf-8"))
+                name = cfg.get("name", f.stem)
+                _agents[name] = cfg
+            except Exception: pass
     # Default to Clay General
     if "Clay General" in _agents and not _current_agent:
         _current_agent = _agents["Clay General"]
@@ -1792,6 +1805,9 @@ class ClayHandler(http.server.SimpleHTTPRequestHandler):
             "/api/tasks/demo": self._handle_demo_tasks,
             # Pro
             "/api/pro/waitlist": self._handle_pro_waitlist,
+            # Projects
+            "/api/projects/save": self._handle_project_save,
+            "/api/projects/list": self._handle_project_list,
         }
         handler = routes.get(self.path)
         if handler: handler()
@@ -1811,6 +1827,28 @@ class ClayHandler(http.server.SimpleHTTPRequestHandler):
             else:
                 self._send_json({"error": "Task not found"}, 404)
             return
+        # Projects GET list
+        if self.path == "/api/projects/list":
+            self._handle_project_list()
+            return
+        # Projects DELETE /:id
+        if self.path.startswith("/api/projects/") and len(self.path) > 15:
+            proj_id = self.path.split("/api/projects/")[1].strip("/")
+            pf = PROJECTS_DIR / f"{proj_id}.json"
+            if pf.exists():
+                pf.unlink()
+                self._send_json({"ok": True})
+            else:
+                self._send_json({"error": "not found"}, 404)
+            return
+        # Hardware profile
+        if self.path == "/api/hardware":
+            try:
+                hp = json.loads(HARDWARE_PROFILE_FILE.read_text("utf-8")) if HARDWARE_PROFILE_FILE.exists() else {}
+                self._send_json(hp)
+            except Exception:
+                self._send_json({})
+            return
         # Clay Code Pro routes
         if self.path == "/claycode":
             self._handle_claycode_page()
@@ -1820,6 +1858,9 @@ class ClayHandler(http.server.SimpleHTTPRequestHandler):
             return
         if self.path == "/api/memory/codebase":
             self._handle_codebase_memory()
+            return
+        if self.path == "/api/memory/export":
+            self._handle_memory_export()
             return
         # Fall through to static file serving
         super().do_GET()
@@ -1888,10 +1929,12 @@ class ClayHandler(http.server.SimpleHTTPRequestHandler):
         ollama_body = json.dumps({"model": model, "prompt": full_prompt,
                                    "system": system, "stream": True,
                                    "options": opts}).encode()
+        # Clay Coder uses 90s timeout; blob uses 120s
+        stream_timeout = 90 if is_coder else 120
         try:
             req = urllib.request.Request(f"{OLLAMA_URL}/api/generate", data=ollama_body,
                                          headers={"Content-Type": "application/json"})
-            resp = urllib.request.urlopen(req, timeout=120)
+            resp = urllib.request.urlopen(req, timeout=stream_timeout)
             self.send_response(200)
             self.send_header("Content-Type", "application/x-ndjson")
             self.send_header("Cache-Control", "no-cache")
@@ -1914,7 +1957,31 @@ class ClayHandler(http.server.SimpleHTTPRequestHandler):
                 if _current_agent and _current_agent.get("memory_backend") == "hindsight":
                     _extract_research_insights(prompt, full_response)
         except urllib.error.URLError as e:
-            self._send_json({"error": f"Cannot reach Ollama: {e}"}, 502)
+            print(f"  [engine] streaming call failed: {e}")
+            # Silent recovery attempt
+            if _ensure_ollama(max_wait=10):
+                try:
+                    req2 = urllib.request.Request(f"{OLLAMA_URL}/api/generate", data=ollama_body,
+                                                  headers={"Content-Type": "application/json"})
+                    resp2 = urllib.request.urlopen(req2, timeout=120)
+                    self.send_response(200)
+                    self.send_header("Content-Type", "application/x-ndjson")
+                    self.send_header("Cache-Control", "no-cache")
+                    self.send_header("Access-Control-Allow-Origin", "*")
+                    self.end_headers()
+                    for line in resp2:
+                        self.wfile.write(line); self.wfile.flush()
+                    return
+                except Exception as e2:
+                    print(f"  [engine] retry also failed: {e2}")
+            # User-facing: never mention Ollama by name
+            self.send_response(503)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Access-Control-Allow-Origin", "*")
+            self.end_headers()
+            self.wfile.write(json.dumps({
+                "error": "Clay needs a moment to start. Please try again in a few seconds."
+            }).encode())
         except Exception as e:
             self._send_json({"error": str(e)}, 500)
 
@@ -2229,7 +2296,9 @@ class ClayHandler(http.server.SimpleHTTPRequestHandler):
             self.end_headers()
             self.wfile.write(html)
             return
-        clay_html = BASE_DIR / "static" / "claycode.html"
+        clay_html = BASE_DIR / "pro" / "claycode.html"
+        if not clay_html.exists():
+            clay_html = BASE_DIR / "static" / "claycode.html"  # fallback
         if not clay_html.exists():
             self.send_error(404, "claycode.html not found")
             return
@@ -2275,6 +2344,91 @@ class ClayHandler(http.server.SimpleHTTPRequestHandler):
     def _handle_codebase_memory(self):
         items = _codebase_memory_get_all()
         self._send_json({"memories": items, "count": len(items)})
+
+    def _handle_memory_export(self):
+        """Export all memory data as a single JSON blob."""
+        def _get_collection_all(name):
+            if not _research_db: return []
+            try:
+                col = _research_db.get_collection(name)
+                if col.count() == 0: return []
+                data = col.get(include=["documents", "metadatas"])
+                docs = data.get("documents", [])
+                metas = data.get("metadatas", [])
+                return [{"content": d, **(m or {})} for d, m in zip(docs, metas)]
+            except Exception: return []
+
+        export = {
+            "exported": datetime.now().isoformat(),
+            "factual": _get_collection_all("factual"),
+            "experiential": _get_collection_all("experiential"),
+            "beliefs": _get_collection_all("beliefs"),
+            "codebase": _codebase_memory_get_all(),
+            "mem0": [],
+        }
+        # Mem0 memories
+        try:
+            raw = _memory_get_all()
+            export["mem0"] = [
+                {"content": (m.get("memory") or m.get("text") or str(m)),
+                 "created_at": m.get("created_at", "")}
+                for m in raw
+            ]
+        except Exception: pass
+
+        payload = json.dumps(export, ensure_ascii=False, indent=2).encode("utf-8")
+        self.send_response(200)
+        self.send_header("Content-Type", "application/json; charset=utf-8")
+        self.send_header("Content-Length", str(len(payload)))
+        self.send_header("Access-Control-Allow-Origin", "*")
+        self.end_headers()
+        self.wfile.write(payload)
+
+    def _handle_project_save(self):
+        body = json.loads(self._read_body())
+        proj_id = body.get("id") or str(uuid.uuid4())
+        PROJECTS_DIR.mkdir(exist_ok=True)
+        # Auto-name from first 6 words of first user message
+        messages = body.get("messages", [])
+        name = body.get("name", "")
+        if not name and messages:
+            first_user = next((m.get("content", "") for m in messages if m.get("role") == "user"), "")
+            words = first_user.split()[:6]
+            name = " ".join(words) or "Untitled project"
+        project = {
+            "id": proj_id,
+            "name": name,
+            "created_at": body.get("created_at", datetime.now().isoformat()),
+            "updated_at": datetime.now().isoformat(),
+            "agent": body.get("agent", _current_agent.get("name", "") if _current_agent else ""),
+            "agent_color": body.get("agent_color", _current_agent.get("color_accent", "#e06438") if _current_agent else "#e06438"),
+            "message_count": len(messages),
+            "messages": messages[-200:],  # cap at 200 messages per project
+            "source": body.get("source", "blob"),  # 'blob' or 'claycode'
+        }
+        pf = PROJECTS_DIR / f"{proj_id}.json"
+        pf.write_text(json.dumps(project, ensure_ascii=False, indent=2), "utf-8")
+        self._send_json({"ok": True, "id": proj_id, "name": name})
+
+    def _handle_project_list(self):
+        PROJECTS_DIR.mkdir(exist_ok=True)
+        projects = []
+        for pf in sorted(PROJECTS_DIR.glob("*.json"), key=lambda f: f.stat().st_mtime, reverse=True):
+            try:
+                p = json.loads(pf.read_text("utf-8"))
+                projects.append({
+                    "id": p.get("id", pf.stem),
+                    "name": p.get("name", "Untitled"),
+                    "created_at": p.get("created_at", ""),
+                    "updated_at": p.get("updated_at", ""),
+                    "agent": p.get("agent", ""),
+                    "agent_color": p.get("agent_color", "#e06438"),
+                    "message_count": p.get("message_count", 0),
+                    "source": p.get("source", "blob"),
+                })
+            except Exception:
+                pass
+        self._send_json({"projects": projects})
 
     def _handle_pro_waitlist(self):
         body = json.loads(self._read_body())
@@ -2340,7 +2494,7 @@ def main():
         sys.exit(0)
     # Create directories
     for d in [WIKI_DIR / "regulations", WIKI_DIR / "papers", WIKI_DIR / "cases",
-              MEMORY_DIR, WATCHERS_DIR, AGENTS_DIR, LOGS_DIR, SANDBOX_DIR, MEMORY_STORE_DIR, TASKS_DIR]:
+              MEMORY_DIR, WATCHERS_DIR, AGENTS_DIR, LOGS_DIR, SANDBOX_DIR, MEMORY_STORE_DIR, TASKS_DIR, PROJECTS_DIR]:
         d.mkdir(parents=True, exist_ok=True)
     # Start Ollama
     print("  Starting engine...", end=" ", flush=True)
@@ -2356,8 +2510,17 @@ def main():
     # Hardware profile
     hw = _detect_hardware()
     print(f"  Hardware: {hw.get('cpu_cores','?')} cores · {hw.get('ram_gb','?')} GB RAM · GPU: {hw.get('gpu','none')}")
+    # Auto-create pro/license.key so Clay Code always works locally
+    _pro_dir = BASE_DIR / "pro"
+    _license_key = _pro_dir / "license.key"
+    if not _license_key.exists():
+        _pro_dir.mkdir(exist_ok=True)
+        _license_key.write_text("dev-key", "utf-8")
+        print("  Pro license: dev-key created")
+    # Model health check on startup + every 30 min
+    _model_health_check()
+    _start_model_health_thread()
     # Load agents
-    _load_agents()
     if _agents:
         names = ", ".join(_agents.keys())
         active = _current_agent.get("name", "?") if _current_agent else "?"

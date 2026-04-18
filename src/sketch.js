@@ -20,6 +20,9 @@ let canvasStatus = ""; // "Escuchando..." | "Procesando..." | ""
 let canvasStatusAlpha = 0;
 let meshActive = false;
 let logPulse = 0; // log write indicator pulse
+let heartbeatPulse = 0; // expands blob when first token arrives
+let _thinkingTextIdx = 0;
+const THINKING_TEXTS = ["pensando...", "thinking...", "réfléchis...", "pensando..."];
 let execResultData = null; // data from last sandbox execution
 let execResultTimer = 0;
 
@@ -224,6 +227,7 @@ async function askOllama(prompt) {
     const reader = resp.body.getReader();
     const decoder = new TextDecoder();
     let fullText = "";
+    let _firstToken = true;
     while (true) {
       const { done, value } = await reader.read();
       if (done) break;
@@ -231,7 +235,10 @@ async function askOllama(prompt) {
       for (const line of lines) {
         try {
           const data = JSON.parse(line);
-          if (data.response) { fullText += data.response; responseText = fullText; }
+          if (data.response) {
+            if (_firstToken) { heartbeatPulse = 1.0; _firstToken = false; }
+            fullText += data.response; responseText = fullText;
+          }
           if (data.done) {
             // Demo Mode: minimum 2s thinking before speaking
             if (window.demoMode) {
@@ -257,7 +264,7 @@ function draw() {
   breathPhase += 0.015;
 
   if (!animInited) {
-    let fullR = min(width, height) * 0.16;
+    let fullR = min(width, height) * 0.192;
     targetCY = height * 0.35; currentCY = height * 0.35;
     targetRadius = fullR; currentRadius = 0;
     animInited = true;
@@ -272,7 +279,7 @@ function draw() {
     CLAY_BASE[2] = lerp(morphFrom[2], morphTo[2], ease);
   }
 
-  let fullR = min(width, height) * 0.16;
+  let fullR = min(width, height) * 0.192;
   if (state === "speaking" || (state === "thinking" && responseText.length > 0)) {
     targetRadius = fullR * 0.5; targetCY = height * 0.18;
   } else if (state === "thinking") {
@@ -290,6 +297,9 @@ function draw() {
 
   // File pulse
   if (filePulse > 0) { targetRadius = fullR * (1 + filePulse * 0.15); filePulse *= 0.92; if (filePulse < 0.01) filePulse = 0; }
+
+  // Heartbeat pulse — decays after first token arrives
+  if (heartbeatPulse > 0) { heartbeatPulse *= 0.88; if (heartbeatPulse < 0.01) heartbeatPulse = 0; }
 
   currentCY = lerp(currentCY, targetCY, 0.06);
   currentRadius = lerp(currentRadius, targetRadius, 0.06);
@@ -353,18 +363,24 @@ function draw() {
 
 function drawGlow(cx, cy) {
   noStroke();
-  let pulseSize = state === "thinking" ? baseRadius * 2.5 + sin(breathPhase*3)*30
-    : state === "recording" ? baseRadius * 2.8 + sin(breathPhase*1.5)*20
+  let pulseSize = state === "thinking" ? baseRadius * 2.8 + sin(breathPhase*3)*35
+    : state === "recording" ? baseRadius * 3.0 + sin(breathPhase*1.5)*20
     : state === "muted" ? baseRadius * 1.8
-    : state === "executing" ? baseRadius * 2.0 + sin(breathPhase*5)*15
-    : baseRadius * 2.2 + sin(breathPhase)*10;
-  for (let i = 5; i > 0; i--) {
-    let a = map(i, 5, 0, 3, 15);
-    if (state === "thinking") a *= 1.8;
+    : state === "executing" ? baseRadius * 2.2 + sin(breathPhase*5)*18
+    : baseRadius * 2.4 + sin(breathPhase)*12;
+
+  // Heartbeat burst on first token
+  if (heartbeatPulse > 0) pulseSize += heartbeatPulse * baseRadius * 0.8;
+
+  let layers = 7;
+  for (let i = layers; i > 0; i--) {
+    let a = map(i, layers, 0, 4, 22);
+    if (state === "thinking") a *= 2.2;
+    else if (state === "speaking") a *= 1.4;
     if (state === "recording") { fill(200, 50, 50, a * 1.5); }
     else if (state === "muted") { fill(MUTED_CLR[0], MUTED_CLR[1], MUTED_CLR[2], a * 0.6); }
     else { fill(CLAY_BASE[0], CLAY_BASE[1], CLAY_BASE[2], a); }
-    ellipse(cx, cy, pulseSize * (i/5) * 2);
+    ellipse(cx, cy, pulseSize * (i/layers) * 2);
   }
 }
 
@@ -373,8 +389,9 @@ function drawClay(cx, cy) {
     let targetR = baseRadius;
     let nv = noise(p.noiseOff + frameCount * 0.008) - 0.5;
     if (state === "thinking") {
-      targetR += (noise(p.noiseOff + frameCount*0.04)-0.5) * baseRadius * 0.35;
-      targetR += sin(p.angle*3 + frameCount*0.08) * baseRadius * 0.08;
+      targetR += (noise(p.noiseOff + frameCount*0.065)-0.5) * baseRadius * 0.38;
+      targetR += sin(p.angle*3 + frameCount*0.13) * baseRadius * 0.1;
+      if (heartbeatPulse > 0) targetR += heartbeatPulse * baseRadius * 0.25;
     } else if (state === "speaking") {
       targetR += sin(p.angle*2 + breathPhase*2) * baseRadius * 0.06 + nv * baseRadius * 0.08;
     } else if (state === "recording") {
@@ -458,16 +475,38 @@ function drawCanvasStatus(cx, cy) {
 
 function drawThinkingState(cx, cy) {
   let elapsed = (millis() - thinkingStart) / 1000;
+
+  // Rotate THINKING_TEXTS every 4 seconds (240 frames at 60fps)
+  _thinkingTextIdx = floor(elapsed / 4) % THINKING_TEXTS.length;
+
+  // Fade between rotations — alpha dips at the transition boundary
+  let posInCycle = (elapsed % 4) / 4; // 0→1 within each 4s window
+  let fadeAlpha = posInCycle < 0.1 ? map(posInCycle, 0, 0.1, 0, 200)
+                : posInCycle > 0.85 ? map(posInCycle, 0.85, 1, 200, 0)
+                : 200;
+
+  // Orbiting dots
   for (let i = 0; i < 3; i++) {
     let dotAngle = breathPhase*3 + (TWO_PI/3)*i;
     let dotR = baseRadius + 25 + sin(breathPhase*2+i)*8;
-    fill(CLAY_BASE[0], CLAY_BASE[1], CLAY_BASE[2], map(sin(breathPhase*4+i*2),-1,1,100,255));
+    fill(CLAY_BASE[0], CLAY_BASE[1], CLAY_BASE[2], map(sin(breathPhase*4+i*2),-1,1,120,255));
     noStroke(); ellipse(cx + cos(dotAngle)*dotR, cy + sin(dotAngle)*dotR, 7);
   }
-  fill(MUTED_CLR[0], MUTED_CLR[1], MUTED_CLR[2], 180);
-  textAlign(CENTER, CENTER); textSize(12);
-  let dots = ".".repeat(floor(elapsed*2) % 4);
-  text("pensando" + dots, cx, cy + baseRadius + 40);
+
+  // Main thinking text — 16px, rotating language
+  let thinkLabel = elapsed >= 30
+    ? (floor(elapsed / 4) % 2 === 0 ? "casi listo..." : "almost there...")
+    : THINKING_TEXTS[_thinkingTextIdx];
+
+  fill(MUTED_CLR[0], MUTED_CLR[1], MUTED_CLR[2], fadeAlpha);
+  textAlign(CENTER, CENTER); textSize(16);
+  text(thinkLabel, cx, cy + baseRadius + 40);
+
+  // Elapsed seconds counter
+  fill(MUTED_CLR[0], MUTED_CLR[1], MUTED_CLR[2], 120);
+  textSize(11);
+  text(floor(elapsed) + "s", cx, cy + baseRadius + 62);
+
   if (responseText.length > 0) drawResponseText(cx, cy);
 }
 

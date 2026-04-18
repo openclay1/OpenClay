@@ -57,3 +57,11 @@ wiki/log.md
 dist/
 *.egg-info/
 build/
+pro/
+hardware_profile.json
+memory_store/
+memory_store_test/
+tasks/
+projects/
+.claude/
+*.app

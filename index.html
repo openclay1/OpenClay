@@ -65,13 +65,20 @@
     #status-bar { position: fixed; bottom: 80px; left: 50%; transform: translateX(-50%);
       z-index: 10; text-align: center; pointer-events: none; width: 90vw; }
     #status-bar p { font-size: 0.6rem; color: var(--faint); letter-spacing: 0.04em; line-height: 1.5; }
+    #status-bar button { pointer-events: auto; }
     #memory-status {
       background: none; border: 1px solid transparent; border-radius: 9999px;
       font-family: inherit; font-size: 0.6rem; color: var(--faint);
       letter-spacing: 0.04em; padding: 2px 10px; cursor: pointer;
-      transition: border-color 150ms, color 150ms; pointer-events: all;
+      transition: border-color 150ms, color 150ms; pointer-events: auto;
     }
     #memory-status:hover { border-color: var(--agent-color); color: var(--agent-color); }
+    /* Agent cards — explicit block layout, no overlap */
+    .agent-card { display: block; width: 100%; margin-bottom: 8px; padding: 12px;
+      border: 1px solid var(--border); border-radius: 8px; cursor: pointer;
+      background: var(--surface); transition: all var(--transition); text-align: left; }
+    .agent-card:hover { border-color: var(--agent-color) !important; background: var(--accent-soft); }
+    .agent-card.active { border-color: var(--agent-color) !important; background: var(--primary-highlight); }
     /* Settings panel */
     #settings-btn { position: fixed; top: 20px; right: 20px; z-index: 20; }
     /* History button + panel */
@@ -322,15 +329,101 @@
     /* Output link slide-up animation */
     @keyframes slide-up { from{opacity:0;transform:translateY(6px);} to{opacity:1;transform:translateY(0);} }
     .output-link { animation: slide-up 280ms cubic-bezier(0.16,1,0.3,1) both; }
+    /* Globe / language button */
+    #lang-btn { position: fixed; top: 20px; left: 130px; z-index: 20;
+      background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-full);
+      padding: 5px 10px; font-family: inherit; font-size: 0.68rem; font-weight: 500;
+      color: var(--muted); cursor: pointer; transition: all var(--transition); display: flex; align-items: center; gap: 4px; }
+    #lang-btn:hover { border-color: var(--agent-color); color: var(--text); }
+    /* Projects button */
+    #projects-btn { position: fixed; top: 20px; left: 196px; z-index: 20;
+      background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-full);
+      padding: 5px 10px; font-family: inherit; font-size: 0.68rem; font-weight: 500;
+      color: var(--muted); cursor: pointer; transition: all var(--transition); }
+    #projects-btn:hover { border-color: var(--agent-color); color: var(--text); }
+    /* Hardware welcome banner */
+    #hw-banner { position: fixed; top: 58px; left: 50%; transform: translateX(-50%);
+      z-index: 22; background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius-xl); padding: 10px 16px; font-size: 0.72rem;
+      color: var(--text); box-shadow: var(--shadow-md); display: none;
+      align-items: center; gap: 10px; max-width: 92vw; }
+    #hw-banner.visible { display: flex; }
+    #hw-banner .hw-msg { flex: 1; line-height: 1.5; }
+    #hw-banner .hw-msg span { color: var(--agent-color); font-weight: 600; }
+    #hw-banner button { background: none; border: none; color: var(--faint); cursor: pointer;
+      font-size: 0.9rem; padding: 2px 4px; line-height: 1; transition: color var(--transition); flex-shrink: 0; }
+    #hw-banner button:hover { color: var(--text); }
+    /* Projects sidebar panel */
+    #projects-overlay { display: none; position: fixed; inset: 0; z-index: 29; }
+    #projects-overlay.open { display: block; }
+    #projects-panel { position: fixed; top: 56px; left: 20px; width: 300px; max-height: 480px;
+      background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-xl);
+      box-shadow: var(--shadow-md); z-index: 30; display: none; flex-direction: column; overflow: hidden; }
+    #projects-panel.open { display: flex; }
+    #projects-panel-header { padding: 10px 14px; border-bottom: 1px solid var(--border);
+      font-size: 0.68rem; color: var(--muted); letter-spacing: 0.06em; text-transform: uppercase;
+      display: flex; justify-content: space-between; align-items: center; }
+    #projects-list { overflow-y: auto; flex: 1; padding: 6px 0; }
+    .proj-card { padding: 10px 14px; border-bottom: 1px solid var(--divider); cursor: pointer;
+      transition: background var(--transition); }
+    .proj-card:last-child { border-bottom: none; }
+    .proj-card:hover { background: var(--surface-offset); }
+    .proj-card .pc-name { font-size: 0.82rem; color: var(--text); font-weight: 500;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: flex; align-items: center; gap: 6px; }
+    .proj-card .pc-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+    .proj-card .pc-meta { font-size: 0.62rem; color: var(--faint); margin-top: 3px; display: flex; gap: 8px; }
+    .proj-card .pc-actions { display: flex; gap: 6px; margin-top: 6px; }
+    .proj-card .pc-btn { font-size: 0.62rem; padding: 2px 8px; border-radius: var(--radius-full);
+      border: 1px solid var(--border); background: none; color: var(--muted); cursor: pointer;
+      font-family: inherit; transition: all var(--transition); }
+    .proj-card .pc-btn:hover { border-color: var(--agent-color); color: var(--agent-color); }
+    .proj-card .pc-btn.del:hover { border-color: #c0392b; color: #c0392b; }
+    /* Continue banner */
+    #continue-banner { position: fixed; bottom: 92px; left: 50%; transform: translateX(-50%);
+      z-index: 13; background: var(--surface-2); border: 1px solid var(--border);
+      border-radius: var(--radius-xl); padding: 10px 16px; font-size: 0.72rem; color: var(--text);
+      box-shadow: var(--shadow-sm); display: none; align-items: center; gap: 10px; max-width: 92vw; }
+    #continue-banner.visible { display: flex; }
+    #continue-banner .cb-name { color: var(--agent-color); font-weight: 600; }
+    #continue-banner .cb-btns { display: flex; gap: 6px; }
+    #continue-banner .cb-btns button { font-size: 0.68rem; padding: 4px 10px; border-radius: var(--radius-full);
+      border: 1px solid var(--border); background: none; color: var(--muted); cursor: pointer;
+      font-family: inherit; transition: all var(--transition); }
+    #continue-banner .cb-btns button.primary { background: var(--agent-color); border-color: var(--agent-color); color: #fff; }
+    #continue-banner .cb-btns button:hover:not(.primary) { border-color: var(--agent-color); color: var(--agent-color); }
   </style>
 </head>
 <body>
   <div id="title"><h1>OpenClay</h1><p>COANA LABS &middot; LOCAL &middot; PRIVADO &middot; TUYO</p></div>
   <button id="demo-mode-btn" onclick="toggleDemoMode()" title="Demo Mode — smooth animations for screen recording">&#127916; Demo</button>
   <div id="rec-indicator"><span class="rec-dot"></span>REC</div>
+  <button id="lang-btn" onclick="cycleLang()" title="Cambiar idioma / Change language">&#127758; <span id="lang-label">ES</span></button>
+  <button id="projects-btn" onclick="toggleProjects()" title="Projects">&#128193;</button>
   <button id="clay-code-btn" onclick="window.location='/claycode'" title="Clay Code — OpenClay Pro">&#60;/&#62;</button>
   <button class="btn-icon" id="history-btn" onclick="toggleHistory()" title="Session history">&#128336;</button>
   <button class="btn-icon" id="settings-btn" onclick="toggleSettings()">&#9881;</button>
+  <!-- Hardware welcome banner -->
+  <div id="hw-banner">
+    <div class="hw-msg" id="hw-banner-msg"></div>
+    <button onclick="dismissHwBanner()" title="Dismiss">&times;</button>
+  </div>
+  <!-- Projects panel -->
+  <div id="projects-overlay" onclick="toggleProjects()"></div>
+  <div id="projects-panel">
+    <div id="projects-panel-header">
+      <span>Proyectos guardados</span>
+      <span id="projects-count" style="color:var(--faint)"></span>
+    </div>
+    <div id="projects-list"><div style="padding:12px 14px;font-size:0.72rem;color:var(--faint)">Cargando…</div></div>
+  </div>
+  <!-- Continue where you left off banner -->
+  <div id="continue-banner">
+    <span>Continuar: <span class="cb-name" id="continue-name"></span></span>
+    <div class="cb-btns">
+      <button class="primary" onclick="continueLastProject()">Continuar</button>
+      <button onclick="dismissContinueBanner()">Descartar</button>
+    </div>
+  </div>
   <div id="history-overlay" onclick="toggleHistory()"></div>
   <div id="history-panel">
     <div id="history-panel-header">Session History</div>
@@ -371,18 +464,22 @@
       <!-- Memory -->
       <div id="tab-memory" class="tab-content">
         <h3>Memoria persistente (Mem0)</h3>
-        <div id="memory-list" style="max-height:calc(100vh - 260px);overflow-y:auto;"></div>
+        <div id="memory-list" style="max-height:calc(100vh - 300px);overflow-y:auto;"></div>
         <div id="research-context" style="display:none;">
           <h3>Contexto de investigaci&oacute;n (Hindsight)</h3>
           <div id="rc-factual" class="rc-network"><h4>Hechos conocidos</h4></div>
           <div id="rc-experiential" class="rc-network"><h4>Sesiones pasadas</h4></div>
           <div id="rc-beliefs" class="rc-network"><h4>Metas inferidas</h4></div>
         </div>
+        <div style="margin-top:12px;">
+          <button onclick="exportMemories()" class="settings-action secondary" style="width:100%;">&#128229; Export my memories</button>
+          <p style="font-size:0.62rem;color:var(--faint);margin-top:6px;line-height:1.4;">Downloads all memories as JSON. Your data is yours — take it anywhere.</p>
+        </div>
       </div>
       <!-- History -->
       <div id="tab-history" class="tab-content">
         <h3>Conversaciones recientes</h3>
-        <div id="history-list" style="max-height:calc(100vh - 200px);overflow-y:auto;"></div>
+        <div id="session-history-list" style="max-height:calc(100vh - 200px);overflow-y:auto;"></div>
       </div>
       <!-- Logs -->
       <div id="tab-logs" class="tab-content">
@@ -644,33 +741,68 @@
     }
     async function loadSessionHistory(){
       const list = document.getElementById('history-list');
+      list.innerHTML = '<div style="padding:12px 14px;font-size:0.72rem;color:var(--faint)">Loading…</div>';
       try {
         const res = await fetch('/api/logs', {
           method: 'POST',
           headers: {'Content-Type': 'application/json'},
           body: JSON.stringify({})
         });
+        if (!res.ok) throw new Error('status ' + res.status);
         const data = await res.json();
-        const entries = (data.entries || []).filter(e => e.role === 'user').slice(-10).reverse();
-        if (!entries.length) {
-          list.innerHTML = '<div style="padding:12px 14px;font-size:0.72rem;color:var(--faint)">No conversation history today.</div>';
+        // Build paired exchanges: each user msg + the assistant reply that follows it
+        const allEntries = (data.entries || []).filter(e => e.role === 'user' || e.role === 'assistant');
+        const pairs = [];
+        for (let i = 0; i < allEntries.length; i++) {
+          const e = allEntries[i];
+          if (e.role !== 'user') continue;
+          const reply = allEntries[i+1] && allEntries[i+1].role === 'assistant' ? allEntries[i+1] : null;
+          pairs.push({user: e, assistant: reply});
+        }
+        const recent = pairs.slice(-10).reverse();
+        if (!recent.length) {
+          list.innerHTML = '<div style="padding:12px 14px;font-size:0.72rem;color:var(--faint)">No hay historial hoy.</div>';
           return;
         }
-        list.innerHTML = entries.map(e => {
-          const ts = (e.timestamp||'').slice(0,16).replace('T',' ');
-          const text = (e.content||'').slice(0,60) + ((e.content||'').length > 60 ? '…' : '');
-          return `<div class="history-item" onclick="restoreFromHistory(${JSON.stringify(e.content||'').replace(/</g,'&lt;')})">
-            <div class="hi-time">${ts}</div>
-            <div class="hi-text">${text.replace(/</g,'&lt;').replace(/>/g,'&gt;')}</div>
-          </div>`;
-        }).join('');
+        list.innerHTML = '';
+        recent.forEach(p => {
+          const ts = (p.user.timestamp||'').slice(0,16).replace('T',' ');
+          const preview = (p.user.content||'').slice(0,60) + ((p.user.content||'').length > 60 ? '…' : '');
+          const item = document.createElement('div');
+          item.className = 'history-item';
+          item.innerHTML = '<div class="hi-time">' + ts + '</div><div class="hi-text">' + escapeHtml(preview) + '</div>';
+          item.addEventListener('click', () => restoreExchange(p.user.content||'', p.assistant ? p.assistant.content||'' : ''));
+          list.appendChild(item);
+        });
       } catch(err) {
-        list.innerHTML = '<div style="padding:12px 14px;font-size:0.72rem;color:var(--faint)">Could not load history.</div>';
+        list.innerHTML = '<div style="padding:12px 14px;font-size:0.72rem;color:var(--faint)">No hay historial hoy.</div>';
       }
     }
-    function restoreFromHistory(text){
-      document.getElementById('clay-input').value = text;
-      document.getElementById('clay-input').focus();
+    function restoreExchange(userText, assistantText){
+      // Load the full exchange into the chat as read-only context, then focus input
+      if(userText){
+        addToHistory('user', userText);
+        const uBubble = document.createElement('div');
+        uBubble.className='history-entry user';
+        uBubble.innerHTML='<div class="history-role user">Tú (historial)</div><div class="history-text">'+escapeHtml(userText)+'</div>';
+        uBubble.style.opacity='0.6';
+        const canvas=document.getElementById('canvas-container');
+        if(canvas) canvas.insertAdjacentElement('afterend', uBubble);
+      }
+      if(assistantText){
+        addToHistory('assistant', assistantText);
+        const aBubble = document.createElement('div');
+        aBubble.className='history-entry assistant';
+        aBubble.innerHTML='<div class="history-role assistant">OpenClay (historial)</div><div class="history-text">'+escapeHtml(assistantText.slice(0,300))+(assistantText.length>300?'…':'')+'</div>';
+        aBubble.style.opacity='0.6';
+        const canvas=document.getElementById('canvas-container');
+        if(canvas) canvas.insertAdjacentElement('afterend', aBubble);
+      }
+      const inp = document.getElementById('clay-input');
+      inp.value = '';
+      inp.placeholder = 'Continuar esta conversación…';
+      setTimeout(()=>{ inp.placeholder = 'Pregunta algo... / Ask anything...'; }, 8000);
+      inp.focus();
       toggleHistory();
     }
 
@@ -694,14 +826,19 @@
         const r=await fetch('/api/agents',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'});
         const d=await r.json();
         const el=document.getElementById('agents-list'); el.innerHTML='';
+        console.log('rendering agents', d.agents);
         (d.agents||[]).forEach(a=>{
           const card=document.createElement('div');
           card.className='agent-card'+(a.active?' active':'');
-          card.innerHTML='<div class="ac-name"><span class="ac-dot" style="background:'+a.color_accent+'"></span>'+a.name+'</div><div class="ac-desc">'+a.description+(a.workflows?' \u00B7 '+a.workflows+' workflows':'')+'</div>';
-          card.onclick=()=>selectAgent(a.name);
+          card.style.borderColor = a.active ? (a.color_accent||'var(--agent-color)') : '';
+          card.innerHTML='<div class="ac-name"><span class="ac-dot" style="background:'+a.color_accent+'"></span>'+escapeHtml(a.name)+'</div><div class="ac-desc">'+escapeHtml(a.description||'')+(a.workflows?' \u00B7 '+a.workflows+' workflows':'')+'</div>';
+          card.addEventListener('click', function(){
+            console.log('agent clicked', a.name);
+            selectAgent(a.name);
+          });
           el.appendChild(card);
         });
-      }catch(e){}
+      }catch(e){console.error('loadAgents error', e);}
     }
     const _AGENT_CYCLE = [
       {name:'Clay General',   color:'#e06438'},
@@ -730,12 +867,13 @@
             document.getElementById('disclaimer').classList.add('visible');
             setTimeout(()=>document.getElementById('disclaimer').classList.remove('visible'),6000);
           }
-          // Trigger clay morph
           if(typeof triggerAgentMorph==='function') triggerAgentMorph(d.color_accent);
           loadAgents();
           showBadge('agent',name,false);
+          // Close settings panel after selecting
+          if(settingsOpen) toggleSettings();
         }
-      }catch(e){}
+      }catch(e){console.error('selectAgent error',e);}
     }
     function setAgentColor(hex){
       currentAgentColor=hex;
@@ -822,6 +960,27 @@
       });
     }
 
+    // ═══ Memory export ═══
+    async function exportMemories(){
+      try{
+        const r = await fetch('/api/memory/export');
+        if(!r.ok) throw new Error('status ' + r.status);
+        const blob = await r.blob();
+        const date = new Date().toISOString().slice(0,10);
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'openclay_memory_export_' + date + '.json';
+        a.click();
+        URL.revokeObjectURL(url);
+        showBadge('export','✓ Memories exported',false);
+        setTimeout(()=>removeBadge('export'),4000);
+      }catch(e){
+        showBadge('export','✗ Export failed',true);
+        setTimeout(()=>removeBadge('export'),4000);
+      }
+    }
+
     // ═══ Memory ═══
     async function loadMemories(){
       try{
@@ -875,7 +1034,7 @@
       }catch(e){renderHistory();}
     }
     function renderHistory(){
-      const c=document.getElementById('history-list'); if(!c)return; c.innerHTML='';
+      const c=document.getElementById('session-history-list'); if(!c)return; c.innerHTML='';
       if(!localHistory.length){c.innerHTML='<p style="font-size:0.78rem;color:var(--faint);padding:12px 0;text-align:center;">Sin conversaciones a\u00FAn</p>';return;}
       [...localHistory].reverse().slice(0,40).forEach(e=>{
         const div=document.createElement('div'); div.className='history-entry';
@@ -1138,7 +1297,212 @@
         }
       }catch(e){showBadge('task','\u2717 Error',true);}
     }
+    // ═══ Multilingual ═══
+    const LANG_CYCLE = ['es','en','fr','pt'];
+    let currentLang = 'es';
+    const TRANSLATIONS = {
+      es: {
+        title: 'OpenClay',
+        subtitle: 'COANA LABS · LOCAL · PRIVADO · TUYO',
+        placeholder: 'Pregunta algo... / Ask anything...',
+        hint: 'todo es local  /  everything is local',
+        settings_label: 'Agentes',
+        tab_agents: 'Agentes', tab_sources: 'Fuentes', tab_memory: 'Memoria',
+        tab_history: 'Historial', tab_logs: 'Registros', tab_exec: 'Sandbox',
+        tab_mesh: 'Red', tab_tasks: 'Tareas',
+        hw_welcome: '¡Bienvenido! Tu sistema puede responder en aprox.',
+        projects_title: 'Proyectos guardados',
+        continue_label: 'Continuar',
+      },
+      en: {
+        title: 'OpenClay',
+        subtitle: 'COANA LABS · LOCAL · PRIVATE · YOURS',
+        placeholder: 'Ask anything...',
+        hint: 'everything is local  /  todo es local',
+        settings_label: 'Agents',
+        tab_agents: 'Agents', tab_sources: 'Sources', tab_memory: 'Memory',
+        tab_history: 'History', tab_logs: 'Logs', tab_exec: 'Sandbox',
+        tab_mesh: 'Network', tab_tasks: 'Tasks',
+        hw_welcome: 'Welcome! Your system can respond in about',
+        projects_title: 'Saved projects',
+        continue_label: 'Continue',
+      },
+      fr: {
+        title: 'OpenClay',
+        subtitle: 'COANA LABS · LOCAL · PRIVÉ · À TOI',
+        placeholder: 'Pose une question...',
+        hint: 'tout est local  /  todo es local',
+        settings_label: 'Agents',
+        tab_agents: 'Agents', tab_sources: 'Sources', tab_memory: 'Mémoire',
+        tab_history: 'Historique', tab_logs: 'Journaux', tab_exec: 'Sandbox',
+        tab_mesh: 'Réseau', tab_tasks: 'Tâches',
+        hw_welcome: 'Bienvenue ! Votre système peut répondre en environ',
+        projects_title: 'Projets sauvegardés',
+        continue_label: 'Continuer',
+      },
+      pt: {
+        title: 'OpenClay',
+        subtitle: 'COANA LABS · LOCAL · PRIVADO · SEU',
+        placeholder: 'Pergunte algo...',
+        hint: 'tudo é local  /  everything is local',
+        settings_label: 'Agentes',
+        tab_agents: 'Agentes', tab_sources: 'Fontes', tab_memory: 'Memória',
+        tab_history: 'Histórico', tab_logs: 'Registros', tab_exec: 'Sandbox',
+        tab_mesh: 'Rede', tab_tasks: 'Tarefas',
+        hw_welcome: 'Bem-vindo! Seu sistema pode responder em aprox.',
+        projects_title: 'Projetos salvos',
+        continue_label: 'Continuar',
+      }
+    };
+    function cycleLang() {
+      const idx = (LANG_CYCLE.indexOf(currentLang) + 1) % LANG_CYCLE.length;
+      currentLang = LANG_CYCLE[idx];
+      document.getElementById('lang-label').textContent = currentLang.toUpperCase();
+      applyLang();
+    }
+    function applyLang() {
+      const t = TRANSLATIONS[currentLang] || TRANSLATIONS.es;
+      const inp = document.getElementById('clay-input');
+      if (inp) inp.placeholder = t.placeholder;
+      const sub = document.querySelector('#title p');
+      if (sub) sub.textContent = t.subtitle;
+      const ph = document.getElementById('projects-panel-header');
+      if (ph) ph.querySelector('span').textContent = t.projects_title;
+    }
+
+    // ═══ Hardware banner ═══
+    async function checkHardwareBanner() {
+      if (localStorage.getItem('clay_welcomed')) return;
+      try {
+        const r = await fetch('/api/hardware');
+        if (!r.ok) return;
+        const d = await r.json();
+        const est = d.estimated_response_time || '3–8 seconds';
+        const t = TRANSLATIONS[currentLang] || TRANSLATIONS.es;
+        const banner = document.getElementById('hw-banner');
+        document.getElementById('hw-banner-msg').innerHTML =
+          t.hw_welcome + ' <span>' + est + '</span>. Todo el procesamiento ocurre en tu máquina.';
+        banner.classList.add('visible');
+      } catch(e) {}
+    }
+    function dismissHwBanner() {
+      document.getElementById('hw-banner').classList.remove('visible');
+      localStorage.setItem('clay_welcomed', '1');
+    }
+
+    // ═══ Projects ═══
+    let projectsOpen = false;
+    let _lastProject = null;
+    function toggleProjects() {
+      projectsOpen = !projectsOpen;
+      document.getElementById('projects-panel').classList.toggle('open', projectsOpen);
+      document.getElementById('projects-overlay').classList.toggle('open', projectsOpen);
+      if (projectsOpen) loadProjects();
+    }
+    async function loadProjects() {
+      const list = document.getElementById('projects-list');
+      list.innerHTML = '<div style="padding:12px 14px;font-size:0.72rem;color:var(--faint)">Cargando…</div>';
+      try {
+        const r = await fetch('/api/projects/list');
+        if (!r.ok) throw new Error('status ' + r.status);
+        const d = await r.json();
+        const projects = d.projects || [];
+        document.getElementById('projects-count').textContent = projects.length ? projects.length + ' proyectos' : '';
+        if (!projects.length) {
+          list.innerHTML = '<div style="padding:16px 14px;font-size:0.72rem;color:var(--faint);text-align:center;">Sin proyectos guardados.<br>Las conversaciones se guardan automáticamente.</div>';
+          return;
+        }
+        list.innerHTML = '';
+        projects.forEach(p => {
+          const date = new Date(p.updated_at || p.created_at || 0).toLocaleDateString('es-PR', {month:'short',day:'numeric'});
+          const card = document.createElement('div');
+          card.className = 'proj-card';
+          card.innerHTML = `
+            <div class="pc-name">
+              <span class="pc-dot" style="background:${p.agent_color||'var(--agent-color)'}"></span>
+              ${escapeHtml(p.name||'Proyecto sin nombre')}
+            </div>
+            <div class="pc-meta">
+              <span>${date}</span>
+              <span>${p.message_count||0} mensajes</span>
+              <span>${escapeHtml(p.agent_name||'')}</span>
+            </div>
+            <div class="pc-actions">
+              <button class="pc-btn" onclick="continueProject('${p.id}')">Continuar</button>
+              <button class="pc-btn del" onclick="deleteProject('${p.id}')">Borrar</button>
+            </div>`;
+          list.appendChild(card);
+        });
+      } catch(e) {
+        list.innerHTML = '<div style="padding:12px 14px;font-size:0.72rem;color:var(--faint)">Error cargando proyectos.</div>';
+      }
+    }
+    async function deleteProject(id) {
+      try {
+        await fetch('/api/projects/' + id, {method: 'DELETE'});
+        loadProjects();
+      } catch(e) {}
+    }
+    async function continueProject(id) {
+      // Load project and restore conversation context
+      try {
+        const r = await fetch('/api/projects/list');
+        const d = await r.json();
+        const proj = (d.projects||[]).find(p => p.id === id);
+        if (!proj) return;
+        toggleProjects();
+        showBadge('proj', '📂 ' + (proj.name||'Proyecto'), false);
+        setTimeout(() => removeBadge('proj'), 3000);
+        if (proj.agent_name) selectAgent(proj.agent_name);
+        const inp = document.getElementById('clay-input');
+        if (inp) { inp.placeholder = 'Continuando: ' + (proj.name||'proyecto') + '…'; setTimeout(() => { inp.placeholder = 'Pregunta algo...'; }, 6000); inp.focus(); }
+      } catch(e) {}
+    }
+    async function checkContinueBanner() {
+      try {
+        const r = await fetch('/api/projects/list');
+        if (!r.ok) return;
+        const d = await r.json();
+        const projects = d.projects || [];
+        if (!projects.length) return;
+        const last = projects[0]; // newest first
+        _lastProject = last;
+        document.getElementById('continue-name').textContent = last.name || 'proyecto reciente';
+        document.getElementById('continue-banner').classList.add('visible');
+        setTimeout(dismissContinueBanner, 12000); // auto-dismiss after 12s
+      } catch(e) {}
+    }
+    function continueLastProject() {
+      dismissContinueBanner();
+      if (_lastProject) continueProject(_lastProject.id);
+    }
+    function dismissContinueBanner() {
+      document.getElementById('continue-banner').classList.remove('visible');
+    }
+
+    // ═══ Auto-save project on each exchange ═══
+    async function autoSaveProject(userMsg, assistantMsg) {
+      try {
+        const agentEl = document.querySelector('.agent-card.active .ac-name');
+        const agentName = agentEl ? agentEl.textContent.trim() : '';
+        const agentDot = document.querySelector('.agent-card.active .ac-dot');
+        const agentColor = agentDot ? agentDot.style.background : '#e06438';
+        await fetch('/api/projects/save', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({
+            messages: localHistory,
+            agent_name: agentName,
+            agent_color: agentColor,
+            source: 'blob'
+          })
+        });
+      } catch(e) {}
+    }
+
     updateStatus(); setInterval(updateStatus,15000);
+    checkHardwareBanner();
+    setTimeout(checkContinueBanner, 2000);
 
     function escapeHtml(t){const d=document.createElement('div');d.textContent=t;return d.innerHTML;}
   </script>
