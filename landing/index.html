@@ -1,0 +1,1024 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>OpenClay Pro — Your code never leaves your machine.</title>
+  <meta name="description" content="The only coding agent that works offline, learns your codebase over time, and can't be trained on your work." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+  <style>
+    /* ─── Reset & Base ─────────────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:          #0d0d0d;
+      --bg-card:     #111111;
+      --bg-card-2:   #161616;
+      --border:      #222222;
+      --border-soft: #1a1a1a;
+      --text:        #e8e8e8;
+      --text-muted:  #888888;
+      --text-faint:  #444444;
+      --accent:      #00FF9C;
+      --accent-dim:  rgba(0,255,156,0.12);
+      --accent-glow: rgba(0,255,156,0.25);
+      --danger:      #ff4444;
+      --radius-sm:   0.375rem;
+      --radius-md:   0.5rem;
+      --radius-lg:   0.75rem;
+      --radius-xl:   1rem;
+      --radius-2xl:  1.5rem;
+      --radius-full: 9999px;
+      --shadow-sm:   0 1px 3px rgba(0,0,0,0.4);
+      --shadow-md:   0 4px 16px rgba(0,0,0,0.5);
+      --shadow-lg:   0 12px 40px rgba(0,0,0,0.6);
+      --ease:        cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Inter', system-ui, sans-serif;
+      font-size: 1rem;
+      line-height: 1.6;
+      -webkit-font-smoothing: antialiased;
+      overflow-x: hidden;
+    }
+
+    ::selection { background: rgba(0,255,156,0.2); color: var(--text); }
+
+    :focus-visible {
+      outline: 2px solid var(--accent);
+      outline-offset: 3px;
+    }
+
+    /* ─── Scrollbar ─────────────────────────────────────────────────── */
+    ::-webkit-scrollbar { width: 6px; }
+    ::-webkit-scrollbar-track { background: var(--bg); }
+    ::-webkit-scrollbar-thumb { background: #2a2a2a; border-radius: 3px; }
+
+    /* ─── Typography ─────────────────────────────────────────────────── */
+    h1, h2, h3 {
+      line-height: 1.15;
+      text-wrap: balance;
+    }
+
+    code, pre, .mono {
+      font-family: 'JetBrains Mono', 'Fira Code', monospace;
+    }
+
+    /* ─── Layout helpers ─────────────────────────────────────────────── */
+    .container {
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 0 1.5rem;
+    }
+
+    section {
+      padding: 6rem 0;
+    }
+
+    /* ─── Nav ─────────────────────────────────────────────────────────── */
+    nav {
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      background: rgba(13,13,13,0.85);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--border);
+    }
+
+    .nav-inner {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      height: 60px;
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 0 1.5rem;
+    }
+
+    .nav-logo {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 1.05rem;
+      font-weight: 600;
+      color: var(--accent);
+      text-decoration: none;
+      letter-spacing: -0.01em;
+    }
+
+    .nav-logo span { color: var(--text-muted); font-weight: 400; }
+
+    .nav-links {
+      display: flex;
+      align-items: center;
+      gap: 2rem;
+      list-style: none;
+    }
+
+    .nav-links a {
+      color: var(--text-muted);
+      text-decoration: none;
+      font-size: 0.9rem;
+      font-weight: 500;
+      transition: color 180ms var(--ease);
+    }
+
+    .nav-links a:hover { color: var(--text); }
+
+    .nav-cta {
+      background: var(--accent);
+      color: #000 !important;
+      padding: 0.45rem 1.1rem;
+      border-radius: var(--radius-full);
+      font-weight: 600 !important;
+      font-size: 0.85rem !important;
+      transition: opacity 180ms var(--ease), transform 180ms var(--ease) !important;
+    }
+
+    .nav-cta:hover {
+      opacity: 0.9;
+      transform: translateY(-1px);
+      color: #000 !important;
+    }
+
+    /* ─── Hero ─────────────────────────────────────────────────────────── */
+    .hero {
+      padding: 7rem 0 6rem;
+      text-align: center;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .hero::before {
+      content: '';
+      position: absolute;
+      top: -200px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 700px;
+      height: 700px;
+      background: radial-gradient(circle, rgba(0,255,156,0.06) 0%, transparent 70%);
+      pointer-events: none;
+    }
+
+    .hero-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      background: var(--accent-dim);
+      border: 1px solid rgba(0,255,156,0.25);
+      color: var(--accent);
+      font-size: 0.78rem;
+      font-weight: 600;
+      font-family: 'JetBrains Mono', monospace;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      padding: 0.35rem 1rem;
+      border-radius: var(--radius-full);
+      margin-bottom: 2rem;
+    }
+
+    .hero-badge-dot {
+      width: 6px;
+      height: 6px;
+      background: var(--accent);
+      border-radius: 50%;
+      animation: pulse 2s ease-in-out infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.3; }
+    }
+
+    .hero h1 {
+      font-size: clamp(2.2rem, 5vw, 3.8rem);
+      font-weight: 700;
+      letter-spacing: -0.03em;
+      color: var(--text);
+      max-width: 860px;
+      margin: 0 auto 1.5rem;
+    }
+
+    .hero h1 em {
+      font-style: normal;
+      color: var(--accent);
+    }
+
+    .hero-sub {
+      font-size: clamp(1rem, 2vw, 1.2rem);
+      color: var(--text-muted);
+      max-width: 600px;
+      margin: 0 auto 2.5rem;
+      line-height: 1.7;
+    }
+
+    .hero-actions {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 1rem;
+      flex-wrap: wrap;
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      font-family: 'Inter', sans-serif;
+      font-weight: 600;
+      font-size: 0.95rem;
+      padding: 0.75rem 1.75rem;
+      border-radius: var(--radius-full);
+      border: none;
+      cursor: pointer;
+      text-decoration: none;
+      transition: all 180ms var(--ease);
+    }
+
+    .btn-primary {
+      background: var(--accent);
+      color: #000;
+      box-shadow: 0 2px 20px var(--accent-glow);
+    }
+
+    .btn-primary:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 30px var(--accent-glow);
+    }
+
+    .btn-primary:active { transform: translateY(0); }
+
+    .btn-ghost {
+      background: transparent;
+      color: var(--text-muted);
+      border: 1px solid var(--border);
+    }
+
+    .btn-ghost:hover {
+      color: var(--text);
+      border-color: #333;
+      background: var(--bg-card);
+      transform: translateY(-1px);
+    }
+
+    /* ─── Terminal mockup ─────────────────────────────────────────────── */
+    .terminal-wrap {
+      max-width: 760px;
+      margin: 4rem auto 0;
+    }
+
+    .terminal {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-xl);
+      overflow: hidden;
+      box-shadow: var(--shadow-lg);
+    }
+
+    .terminal-bar {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.75rem 1rem;
+      background: var(--bg-card-2);
+      border-bottom: 1px solid var(--border);
+    }
+
+    .terminal-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+    }
+
+    .terminal-dot.red    { background: #ff5f57; }
+    .terminal-dot.yellow { background: #febc2e; }
+    .terminal-dot.green  { background: #28c840; }
+
+    .terminal-title {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.75rem;
+      color: var(--text-faint);
+      margin-left: 0.5rem;
+    }
+
+    .terminal-body {
+      padding: 1.5rem 1.75rem;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.82rem;
+      line-height: 1.8;
+    }
+
+    .t-prompt { color: var(--accent); }
+    .t-cmd    { color: var(--text); }
+    .t-out    { color: var(--text-muted); }
+    .t-accent { color: var(--accent); }
+    .t-dim    { color: var(--text-faint); }
+    .t-cursor {
+      display: inline-block;
+      width: 8px;
+      height: 14px;
+      background: var(--accent);
+      vertical-align: middle;
+      margin-left: 2px;
+      animation: blink 1.2s step-end infinite;
+    }
+
+    @keyframes blink {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0; }
+    }
+
+    /* ─── Section labels ─────────────────────────────────────────────── */
+    .section-label {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.72rem;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--text-faint);
+      margin-bottom: 1rem;
+    }
+
+    .section-label::before {
+      content: '';
+      display: inline-block;
+      width: 20px;
+      height: 1px;
+      background: var(--text-faint);
+    }
+
+    .section-title {
+      font-size: clamp(1.8rem, 3.5vw, 2.6rem);
+      font-weight: 700;
+      letter-spacing: -0.025em;
+      color: var(--text);
+      margin-bottom: 1rem;
+    }
+
+    .section-desc {
+      font-size: 1.05rem;
+      color: var(--text-muted);
+      max-width: 56ch;
+      line-height: 1.7;
+    }
+
+    /* ─── Problem section ─────────────────────────────────────────────── */
+    .problem-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 1.25rem;
+      margin-top: 3rem;
+    }
+
+    .problem-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-xl);
+      padding: 1.75rem;
+      position: relative;
+      overflow: hidden;
+      transition: border-color 180ms var(--ease), box-shadow 180ms var(--ease);
+    }
+
+    .problem-card::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 2px;
+      background: linear-gradient(90deg, transparent, var(--danger), transparent);
+      opacity: 0.5;
+    }
+
+    .problem-card:hover {
+      border-color: #333;
+      box-shadow: var(--shadow-md);
+    }
+
+    .problem-icon {
+      font-size: 1.5rem;
+      margin-bottom: 1rem;
+    }
+
+    .problem-card h3 {
+      font-size: 1rem;
+      font-weight: 600;
+      color: var(--text);
+      margin-bottom: 0.5rem;
+    }
+
+    .problem-card p {
+      font-size: 0.92rem;
+      color: var(--text-muted);
+      line-height: 1.65;
+    }
+
+    .problem-card .tool-badge {
+      display: inline-block;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.7rem;
+      font-weight: 500;
+      padding: 0.2rem 0.6rem;
+      border-radius: var(--radius-sm);
+      background: rgba(255,68,68,0.1);
+      border: 1px solid rgba(255,68,68,0.2);
+      color: #ff7777;
+      margin-bottom: 1rem;
+    }
+
+    /* ─── Divider ─────────────────────────────────────────────────────── */
+    .divider {
+      border: none;
+      border-top: 1px solid var(--border-soft);
+      margin: 0;
+    }
+
+    /* ─── Solution section ─────────────────────────────────────────────── */
+    .solution-list {
+      display: flex;
+      flex-direction: column;
+      gap: 1.25rem;
+      margin-top: 3rem;
+    }
+
+    .solution-row {
+      display: grid;
+      grid-template-columns: auto 1fr;
+      gap: 1.5rem;
+      align-items: start;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-xl);
+      padding: 1.75rem;
+      transition: border-color 180ms var(--ease), background 180ms var(--ease);
+    }
+
+    .solution-row:hover {
+      border-color: rgba(0,255,156,0.25);
+      background: rgba(0,255,156,0.02);
+    }
+
+    .solution-num {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.72rem;
+      font-weight: 600;
+      color: var(--accent);
+      background: var(--accent-dim);
+      border: 1px solid rgba(0,255,156,0.2);
+      border-radius: var(--radius-md);
+      padding: 0.25rem 0.55rem;
+      min-width: 2rem;
+      text-align: center;
+      margin-top: 0.15rem;
+    }
+
+    .solution-content h3 {
+      font-size: 1rem;
+      font-weight: 600;
+      color: var(--text);
+      margin-bottom: 0.4rem;
+    }
+
+    .solution-content p {
+      font-size: 0.92rem;
+      color: var(--text-muted);
+      line-height: 1.65;
+    }
+
+    .solution-content code {
+      font-size: 0.82rem;
+      background: var(--bg-card-2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 0.1rem 0.4rem;
+      color: var(--accent);
+    }
+
+    /* ─── Pricing ─────────────────────────────────────────────────────── */
+    .pricing-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+      gap: 1.5rem;
+      margin-top: 3rem;
+      max-width: 800px;
+    }
+
+    .pricing-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-2xl);
+      padding: 2.25rem;
+      display: flex;
+      flex-direction: column;
+      gap: 1.5rem;
+      transition: border-color 180ms var(--ease), box-shadow 180ms var(--ease);
+    }
+
+    .pricing-card.featured {
+      border-color: rgba(0,255,156,0.3);
+      background: linear-gradient(135deg, #111111 0%, #0f1a14 100%);
+      position: relative;
+    }
+
+    .pricing-card.featured::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      border-radius: inherit;
+      background: radial-gradient(ellipse at top, rgba(0,255,156,0.05) 0%, transparent 60%);
+      pointer-events: none;
+    }
+
+    .pricing-card:hover {
+      box-shadow: var(--shadow-md);
+    }
+
+    .pricing-card.featured:hover {
+      border-color: rgba(0,255,156,0.5);
+      box-shadow: 0 4px 30px rgba(0,255,156,0.1);
+    }
+
+    .plan-header {}
+
+    .plan-tag {
+      display: inline-block;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.7rem;
+      font-weight: 600;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      padding: 0.2rem 0.65rem;
+      border-radius: var(--radius-full);
+      margin-bottom: 1rem;
+    }
+
+    .plan-tag.free {
+      background: rgba(136,136,136,0.12);
+      border: 1px solid rgba(136,136,136,0.2);
+      color: var(--text-muted);
+    }
+
+    .plan-tag.pro {
+      background: var(--accent-dim);
+      border: 1px solid rgba(0,255,156,0.25);
+      color: var(--accent);
+    }
+
+    .plan-name {
+      font-size: 1.3rem;
+      font-weight: 700;
+      color: var(--text);
+      margin-bottom: 0.25rem;
+    }
+
+    .plan-price {
+      font-size: 2.5rem;
+      font-weight: 700;
+      color: var(--text);
+      letter-spacing: -0.04em;
+      line-height: 1;
+    }
+
+    .plan-price span {
+      font-size: 1rem;
+      font-weight: 400;
+      color: var(--text-muted);
+      letter-spacing: 0;
+    }
+
+    .plan-desc {
+      font-size: 0.88rem;
+      color: var(--text-muted);
+      margin-top: 0.5rem;
+    }
+
+    .plan-features {
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: 0.65rem;
+      flex: 1;
+    }
+
+    .plan-features li {
+      display: flex;
+      align-items: flex-start;
+      gap: 0.65rem;
+      font-size: 0.9rem;
+      color: var(--text-muted);
+      line-height: 1.5;
+    }
+
+    .plan-features li::before {
+      content: '✓';
+      color: var(--accent);
+      font-family: 'JetBrains Mono', monospace;
+      font-weight: 600;
+      font-size: 0.8rem;
+      margin-top: 0.15rem;
+      flex-shrink: 0;
+    }
+
+    .plan-features li.dim { color: var(--text-faint); }
+    .plan-features li.dim::before { color: var(--text-faint); content: '—'; }
+
+    .plan-action { margin-top: auto; }
+
+    .btn-outline-accent {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
+      width: 100%;
+      font-family: 'Inter', sans-serif;
+      font-weight: 600;
+      font-size: 0.9rem;
+      padding: 0.75rem 1.5rem;
+      border-radius: var(--radius-full);
+      border: 1.5px solid rgba(0,255,156,0.35);
+      background: transparent;
+      color: var(--accent);
+      cursor: pointer;
+      text-decoration: none;
+      transition: all 180ms var(--ease);
+    }
+
+    .btn-outline-accent:hover {
+      background: var(--accent-dim);
+      border-color: var(--accent);
+      transform: translateY(-1px);
+    }
+
+    .btn-outline-muted {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
+      width: 100%;
+      font-family: 'Inter', sans-serif;
+      font-weight: 600;
+      font-size: 0.9rem;
+      padding: 0.75rem 1.5rem;
+      border-radius: var(--radius-full);
+      border: 1px solid var(--border);
+      background: transparent;
+      color: var(--text-muted);
+      cursor: pointer;
+      text-decoration: none;
+      transition: all 180ms var(--ease);
+    }
+
+    .btn-outline-muted:hover {
+      background: var(--bg-card-2);
+      border-color: #333;
+      color: var(--text);
+      transform: translateY(-1px);
+    }
+
+    /* ─── Footer ─────────────────────────────────────────────────────── */
+    footer {
+      border-top: 1px solid var(--border-soft);
+      padding: 3rem 0;
+    }
+
+    .footer-inner {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 1rem;
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 0 1.5rem;
+    }
+
+    .footer-logo {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.9rem;
+      font-weight: 600;
+      color: var(--accent);
+      text-decoration: none;
+    }
+
+    .footer-links {
+      display: flex;
+      align-items: center;
+      gap: 1.5rem;
+      list-style: none;
+    }
+
+    .footer-links a {
+      font-size: 0.85rem;
+      color: var(--text-faint);
+      text-decoration: none;
+      transition: color 180ms var(--ease);
+    }
+
+    .footer-links a:hover { color: var(--text-muted); }
+
+    .footer-copy {
+      font-size: 0.82rem;
+      color: var(--text-faint);
+    }
+
+    /* ─── Responsive ─────────────────────────────────────────────────── */
+    @media (max-width: 640px) {
+      section { padding: 4rem 0; }
+      .hero   { padding: 4.5rem 0 3.5rem; }
+
+      .nav-links { display: none; }
+
+      .footer-inner {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.75rem;
+      }
+
+      .pricing-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    /* ─── Reduced motion ─────────────────────────────────────────────── */
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after {
+        animation-duration: 0.01ms !important;
+        transition-duration: 0.01ms !important;
+      }
+      html { scroll-behavior: auto; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ── Nav ──────────────────────────────────────────────────────────── -->
+  <nav>
+    <div class="nav-inner">
+      <a href="#" class="nav-logo">OpenClay<span>.pro</span></a>
+      <ul class="nav-links">
+        <li><a href="#problem">Problem</a></li>
+        <li><a href="#solution">Solution</a></li>
+        <li><a href="#pricing">Pricing</a></li>
+        <li><a href="https://github.com/openclay1/OpenClay" target="_blank" rel="noopener">GitHub</a></li>
+        <li>
+          <a href="mailto:waitlist@openclay.pro?subject=OpenClay%20Pro%20Waitlist&body=I%27d%20like%20to%20join%20the%20OpenClay%20Pro%20waitlist." class="nav-cta">Join Waitlist</a>
+        </li>
+      </ul>
+    </div>
+  </nav>
+
+  <!-- ── Hero ─────────────────────────────────────────────────────────── -->
+  <section class="hero">
+    <div class="container">
+      <div class="hero-badge">
+        <span class="hero-badge-dot"></span>
+        Now in early access
+      </div>
+
+      <h1>Your code never leaves your machine.<br /><em>And Clay remembers everything.</em></h1>
+
+      <p class="hero-sub">
+        The only coding agent that works offline, learns your codebase over time,
+        and can't be trained on your work.
+      </p>
+
+      <div class="hero-actions">
+        <a href="mailto:waitlist@openclay.pro?subject=OpenClay%20Pro%20Waitlist&body=I%27d%20like%20to%20join%20the%20OpenClay%20Pro%20waitlist."
+           class="btn btn-primary">
+          Join the Pro Waitlist
+        </a>
+        <a href="https://github.com/openclay1/OpenClay" target="_blank" rel="noopener"
+           class="btn btn-ghost">
+          ★ View on GitHub
+        </a>
+      </div>
+
+      <div class="terminal-wrap">
+        <div class="terminal">
+          <div class="terminal-bar">
+            <div class="terminal-dot red"></div>
+            <div class="terminal-dot yellow"></div>
+            <div class="terminal-dot green"></div>
+            <span class="terminal-title">~ clay</span>
+          </div>
+          <div class="terminal-body">
+            <div><span class="t-prompt">❯</span> <span class="t-cmd">clay start</span></div>
+            <div class="t-out">  Loading model <span class="t-accent">llama3:70b</span> via Ollama...</div>
+            <div class="t-out">  Indexing codebase <span class="t-accent">./src</span> (1,847 files)</div>
+            <div class="t-out">  Memory: <span class="t-accent">412 patterns</span> recalled from last session</div>
+            <div class="t-out">  Network: <span class="t-accent">offline</span> — all inference local</div>
+            <div>&nbsp;</div>
+            <div><span class="t-prompt">❯</span> <span class="t-cmd">clay ask "how does auth middleware work?"</span></div>
+            <div class="t-out">  <span class="t-accent">Clay</span>: Based on your codebase history, <span class="t-accent">auth/middleware.ts</span></div>
+            <div class="t-out">  wraps every route and validates JWT from <span class="t-accent">cookie.session</span>.</div>
+            <div class="t-out">  You last modified this on <span class="t-dim">2026-03-14</span> — the token</div>
+            <div class="t-out">  expiry was changed from <span class="t-dim">1h</span> to <span class="t-accent">7d</span> per your note.</div>
+            <div>&nbsp;</div>
+            <div><span class="t-prompt">❯</span> <span class="t-cursor"></span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <hr class="divider" />
+
+  <!-- ── Problem ──────────────────────────────────────────────────────── -->
+  <section id="problem">
+    <div class="container">
+      <div class="section-label">The problem</div>
+      <h2 class="section-title">Your AI assistant is a liability.</h2>
+      <p class="section-desc">
+        Every major coding assistant sends your code to remote servers, starts fresh
+        every session, and may use your work to train future models.
+      </p>
+
+      <div class="problem-grid">
+        <div class="problem-card">
+          <span class="tool-badge">Cursor / Copilot</span>
+          <div class="problem-icon">📡</div>
+          <h3>Your code ships to their cloud</h3>
+          <p>
+            Every keystroke, every file, every secret in your repo is transmitted
+            to third-party servers for inference. Their privacy policy is not your
+            security model.
+          </p>
+        </div>
+
+        <div class="problem-card">
+          <span class="tool-badge">Cursor / Copilot</span>
+          <div class="problem-icon">🧠</div>
+          <h3>Amnesia on every session</h3>
+          <p>
+            Close the tab and everything is gone. Your assistant has no memory of
+            the architectural decisions you made last week, the bugs you fixed
+            yesterday, or the patterns that define your codebase.
+          </p>
+        </div>
+
+        <div class="problem-card">
+          <span class="tool-badge">Cursor / Copilot</span>
+          <div class="problem-icon">🔁</div>
+          <h3>Your code may train their model</h3>
+          <p>
+            Many tools reserve the right to use your interactions for model
+            improvement. Your proprietary logic, business rules, and novel
+            algorithms could end up in a competitor's suggestion.
+          </p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <hr class="divider" />
+
+  <!-- ── Solution ─────────────────────────────────────────────────────── -->
+  <section id="solution">
+    <div class="container">
+      <div class="section-label">How Clay is different</div>
+      <h2 class="section-title">Built from the ground up<br />for privacy-first teams.</h2>
+      <p class="section-desc">
+        Clay Code runs entirely on your hardware — no cloud calls, no data retention,
+        no fine-print. And it gets smarter the longer you use it.
+      </p>
+
+      <div class="solution-list">
+        <div class="solution-row">
+          <div class="solution-num">01</div>
+          <div class="solution-content">
+            <h3>Runs on your hardware via Ollama</h3>
+            <p>
+              Clay Code uses <code>ollama</code> to run open-weight models — Llama 3,
+              Mistral, Qwen, and more — directly on your CPU or GPU. No API key.
+              No network required. Air-gapped deployments supported.
+            </p>
+          </div>
+        </div>
+
+        <div class="solution-row">
+          <div class="solution-num">02</div>
+          <div class="solution-content">
+            <h3>Persistent codebase memory</h3>
+            <p>
+              Clay builds a semantic index of your project that persists across sessions.
+              It remembers the decisions you made, the patterns you prefer, and the context
+              behind every file — so you never have to explain your architecture twice.
+            </p>
+          </div>
+        </div>
+
+        <div class="solution-row">
+          <div class="solution-num">03</div>
+          <div class="solution-content">
+            <h3>Improves the longer you use it</h3>
+            <p>
+              Hardware-adaptive routing selects the best local model for each task based
+              on your machine's capabilities. As your codebase memory grows, Clay's
+              suggestions become increasingly accurate and context-aware — all offline.
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <hr class="divider" />
+
+  <!-- ── Pricing ──────────────────────────────────────────────────────── -->
+  <section id="pricing">
+    <div class="container">
+      <div class="section-label">Pricing</div>
+      <h2 class="section-title">Simple, honest pricing.</h2>
+      <p class="section-desc">
+        The open-source core is free forever. Pro adds codebase memory,
+        hardware-adaptive routing, and priority support.
+      </p>
+
+      <div class="pricing-grid">
+        <!-- Free -->
+        <div class="pricing-card">
+          <div class="plan-header">
+            <div class="plan-tag free">Free</div>
+            <div class="plan-name">Open Source</div>
+            <div class="plan-price">$0 <span>/ forever</span></div>
+            <p class="plan-desc">The full base agent. Self-hosted, no strings attached.</p>
+          </div>
+
+          <ul class="plan-features">
+            <li>Clay Code CLI agent</li>
+            <li>Ollama model integration</li>
+            <li>Full source on GitHub</li>
+            <li>Community support</li>
+            <li class="dim">Persistent codebase memory</li>
+            <li class="dim">Hardware-adaptive routing</li>
+            <li class="dim">Priority support</li>
+          </ul>
+
+          <div class="plan-action">
+            <a href="https://github.com/openclay1/OpenClay" target="_blank" rel="noopener"
+               class="btn-outline-muted">
+              Download on GitHub ↗
+            </a>
+          </div>
+        </div>
+
+        <!-- Pro -->
+        <div class="pricing-card featured">
+          <div class="plan-header">
+            <div class="plan-tag pro">Pro</div>
+            <div class="plan-name">Clay Code Pro</div>
+            <div class="plan-price">$12 <span>/ month</span></div>
+            <p class="plan-desc">Everything in Free, plus memory and smart routing.</p>
+          </div>
+
+          <ul class="plan-features">
+            <li>Everything in Free</li>
+            <li>Persistent codebase memory</li>
+            <li>Cross-session context recall</li>
+            <li>Hardware-adaptive model routing</li>
+            <li>Priority support &amp; early access</li>
+          </ul>
+
+          <div class="plan-action">
+            <a href="mailto:waitlist@openclay.pro?subject=OpenClay%20Pro%20Waitlist%20%E2%80%94%20%2412%2Fmo&body=Hi%2C%0A%0AI%27d%20like%20to%20join%20the%20OpenClay%20Pro%20waitlist.%0A%0AAbout%20my%20use%20case%3A%0A"
+               class="btn-outline-accent">
+              Join the waitlist →
+            </a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <hr class="divider" />
+
+  <!-- ── Footer ───────────────────────────────────────────────────────── -->
+  <footer>
+    <div class="footer-inner">
+      <a href="#" class="footer-logo">OpenClay</a>
+
+      <ul class="footer-links">
+        <li><a href="https://github.com/openclay1/OpenClay" target="_blank" rel="noopener">GitHub</a></li>
+        <li><a href="#problem">Problem</a></li>
+        <li><a href="#solution">Solution</a></li>
+        <li><a href="#pricing">Pricing</a></li>
+        <li><a href="mailto:waitlist@openclay.pro">Contact</a></li>
+      </ul>
+
+      <p class="footer-copy">© 2026 OpenClay. Open source.</p>
+    </div>
+  </footer>
+
+</body>
+</html>
