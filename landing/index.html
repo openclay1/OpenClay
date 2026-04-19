@@ -467,6 +467,31 @@
     .footer-links a:hover { color: var(--text); }
     .footer-copy { font-size: 0.75rem; color: var(--faint); }
 
+    /* ── KNOWU-BENCH STATS ── */
+    .knowu-section { background: #0a0f14; border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); }
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 48px; margin-bottom: 48px;
+    }
+    .stat-block { text-align: left; }
+    .stat-number {
+      font-family: 'Instrument Serif', Georgia, serif;
+      font-style: italic;
+      font-size: clamp(4rem, 10vw, 5rem);
+      color: var(--amber-light); line-height: 1; margin-bottom: 8px;
+    }
+    .stat-label {
+      font-size: 0.72rem; font-weight: 700; letter-spacing: 0.08em;
+      text-transform: uppercase; color: var(--amber); margin-bottom: 12px;
+    }
+    .stat-body { font-size: 0.82rem; color: var(--muted); line-height: 1.65; max-width: 36ch; }
+    .stat-insight {
+      font-size: 0.95rem; color: var(--muted); line-height: 1.75;
+      border-left: 2px solid var(--amber); padding-left: 20px;
+      max-width: 72ch;
+    }
+
     /* ── MOBILE STICKY BAR ── */
     .mobile-sticky {
       display: none;
@@ -533,6 +558,9 @@
         OpenClay is a local AI research assistant that runs entirely on your hardware.
         No subscriptions, no servers, no data leaving your machine — ever.
         Pharmaceutical-grade precision meets full personal sovereignty.
+      </p>
+      <p style="font-size:0.85rem;color:rgba(255,255,255,0.45);margin-top:12px;line-height:1.6;">
+        Not a slot machine. No regenerate button. No credit anxiety. Just your AI, running locally, working for you.
       </p>
       <div class="hero-ctas">
         <a href="https://github.com/coanalabs/openclay" class="btn-primary" data-umami-event="download_free">Download free</a>
@@ -721,6 +749,32 @@
     </div>
   </section>
 
+  <!-- Why Memory Matters — KnowU-Bench -->
+  <section class="knowu-section">
+    <div class="container">
+      <div style="text-align:center; margin-bottom:48px;">
+        <div class="section-label">Research-backed</div>
+        <h2 class="section-title">Why memory matters</h2>
+        <div class="section-divider"></div>
+      </div>
+      <div class="stats-grid">
+        <div class="stat-block">
+          <div class="stat-number">44%</div>
+          <div class="stat-label">AI success rate with personal context</div>
+          <p class="stat-body">The best available model (Claude Sonnet) on tasks requiring personal context — KnowU-Bench, Zhejiang University + Apple + Tencent, April 2026 (arXiv:2604.08455).</p>
+        </div>
+        <div class="stat-block">
+          <div class="stat-number">100%</div>
+          <div class="stat-label">Your data stays on your machine</div>
+          <p class="stat-body">No cloud. No passport required. No tokens consumed. Every memory, every document, every conversation — on your hardware, under your control.</p>
+        </div>
+      </div>
+      <p class="stat-insight">
+        93.8% of AI failures aren't technical. They're about not knowing you. OpenClay's memory layer — built on SOUL.md, Mem0, and your own knowledge base — is the direct answer to what research now identifies as AI's core limitation.
+      </p>
+    </div>
+  </section>
+
   <!-- Pricing -->
   <section id="pricing" style="background:var(--surface); border-top:1px solid var(--border);">
     <div class="container" style="text-align:center;">
@@ -792,7 +846,7 @@
     <a href="#" class="footer-logo">OpenClay</a>
     <div class="footer-links">
       <a href="https://github.com/coanalabs/openclay">GitHub</a>
-      <a href="/docs/openclay_public_whitepaper.md">Whitepaper</a>
+      <a href="/docs/openclay_public_whitepaper.md" data-umami-event="whitepaper_read">Whitepaper</a>
       <a href="https://coanalabs.gumroad.com/l/openclay-pro">Pro</a>
       <a href="mailto:hello@coanalabs.com">Contact</a>
     </div>

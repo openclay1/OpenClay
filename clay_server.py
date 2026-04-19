@@ -86,6 +86,7 @@ _active_tasks = {}      # id -> task dict
 _task_threads = {}      # id -> thread
 _session_id = str(uuid.uuid4())[:8]   # unique ID per server start
 CONV_DIR = BASE_DIR / "projects" / "conversations"
+_last_memories_used: list[str] = []   # snippets used in last _build_system_prompt call
 
 # ── Pro license ──────────────────────────────────────────────────
 PRO_ACTIVE = False
@@ -1652,6 +1653,8 @@ def _run_demo_task(task):
 SYSTEM_PROMPT = """You are OpenClay, a local AI research assistant running on a COANA Labs device in Puerto Rico. You specialize in pharmaceutical compliance (FDA 21 CFR, EU GMP Annex 1, ICH guidelines), clinical research methodology, and scientific paper analysis. You respond in whatever language the user writes in — Spanish or English. You are precise, cite specific regulatory sections when relevant, and flag ambiguities and logical gaps in documents you analyze. When uncertain, say so clearly and explain what information would resolve the uncertainty."""
 
 def _build_system_prompt(query=""):
+    global _last_memories_used
+    _last_memories_used = []
     parts = []
     # Soul document first
     if _soul_text:
@@ -1682,7 +1685,9 @@ def _build_system_prompt(query=""):
             if memories:
                 for m in memories:
                     text = m.get("memory", m.get("text", str(m))) if isinstance(m, dict) else str(m)
-                    if text: mem_lines.append(f"- {text}")
+                    if text:
+                        mem_lines.append(f"- {text}")
+                        _last_memories_used.append(text)
         except Exception:
             pass
         mem_block = "\n".join(mem_lines) if mem_lines else "No specific memories yet — pay attention and learn"
@@ -2207,6 +2212,12 @@ class ClayHandler(http.server.SimpleHTTPRequestHandler):
                         )
                     except Exception:
                         pass
+                # Send memory metadata to client so UI can show the "Remembered" pill
+                snippets = [t[:80] for t in _last_memories_used[:3]]
+                if snippets:
+                    meta_line = json.dumps({"meta": True, "memories_used": snippets}, ensure_ascii=False) + "\n"
+                    try: self.wfile.write(meta_line.encode()); self.wfile.flush()
+                    except Exception: pass
         except urllib.error.URLError as e:
             print(f"  [engine] streaming call failed: {e}")
             # Silent recovery attempt

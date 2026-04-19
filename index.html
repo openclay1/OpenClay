@@ -78,6 +78,23 @@
       transition: border-color 150ms, color 150ms; pointer-events: auto;
     }
     #memory-status:hover { border-color: var(--agent-color); color: var(--agent-color); }
+    /* Memory pill — appears after Clay uses memories in a response */
+    #memory-pill {
+      display: none;
+      position: fixed; bottom: 108px; left: 50%; transform: translateX(-50%);
+      z-index: 11;
+      font-size: 11px; color: rgba(218,113,1,0.7);
+      border: 1px solid rgba(218,113,1,0.2);
+      border-radius: 12px; padding: 4px 10px;
+      cursor: pointer; pointer-events: auto;
+      white-space: nowrap; max-width: calc(100vw - 32px);
+      overflow: hidden; text-overflow: ellipsis;
+      background: rgba(218,113,1,0.04);
+      transition: opacity 400ms, border-color var(--transition);
+      animation: pill-fade-in 300ms ease forwards;
+    }
+    #memory-pill:hover { border-color: rgba(218,113,1,0.5); color: rgba(218,113,1,1); }
+    @keyframes pill-fade-in { from { opacity: 0; transform: translateX(-50%) translateY(4px); } to { opacity: 1; transform: translateX(-50%) translateY(0); } }
     /* Agent cards — explicit block layout, no overlap */
     .agent-card { display: block; width: 100%; margin-bottom: 8px; padding: 12px;
       border: 1px solid var(--border); border-radius: 8px; cursor: pointer;
@@ -724,6 +741,7 @@
     </div>
   </div>
   <div id="canvas-container"></div>
+  <div id="memory-pill" onclick="toggleSettings();switchTab('memory')" title="Click to open memory tab"></div>
   <div id="status-bar">
     <p id="privacy-text">100% local &middot; nada sale de tu computadora</p>
     <button id="memory-status" onclick="cycleAgent()" title="Click to switch agent"></button>
@@ -871,6 +889,17 @@
           try { recognition.start(); } catch(e3) { setAppState('idle'); }
         }, 150);
       }
+    }
+
+    // ═══ Memory pill ═══
+    function _showMemoryPill(memories) {
+      const pill = document.getElementById('memory-pill');
+      if (!pill || !memories || !memories.length) return;
+      const snippets = memories.slice(0, 3).map(t => String(t).slice(0, 80).trim());
+      pill.textContent = '💭 Clay remembered · ' + snippets.join(' · ');
+      pill.style.display = 'block';
+      clearTimeout(window._pillTimer);
+      window._pillTimer = setTimeout(() => { pill.style.display = 'none'; }, 12000);
     }
 
     // ═══ Mute / Stop ═══

@@ -243,6 +243,13 @@ async function askOllama(prompt) {
       for (const line of lines) {
         try {
           const data = JSON.parse(line);
+          if (data.meta) {
+            if (data.memories_used && data.memories_used.length) {
+              window._lastMemoriesUsed = data.memories_used;
+              if (typeof _showMemoryPill === 'function') _showMemoryPill(data.memories_used);
+            }
+            continue;
+          }
           if (data.response) {
             if (_firstToken) { heartbeatPulse = 1.0; _firstToken = false; }
             fullText += data.response; responseText = fullText;

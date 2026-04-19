@@ -102,7 +102,19 @@ The default model (`qwen2.5:3b`) runs on any configuration above. Larger models 
 
 ---
 
-## 6. Clay Code
+## 6. The Memory Gap
+
+In April 2026, researchers from Zhejiang University, Apple, and Tencent published KnowU-Bench, an evaluation framework for personalized mobile agents (arXiv:2604.08455). Their findings are unambiguous: even frontier models like Claude Sonnet 4.6 drop below 50% success rate on tasks requiring personal context. The core bottlenecks identified are preference acquisition and intervention calibration — not GUI navigation, not reasoning capability.
+
+OpenClay's architecture addresses this gap directly. SOUL.md functions as a persistent user identity layer — a document the user writes once and that travels into every system prompt, giving the model a stable sense of who it is talking to. Mem0 provides episodic and semantic memory with hybrid retrieval, surfacing relevant facts from past conversations at query time. Hindsight indexes the user's own documents and knowledge base, enabling document-grounded answers without cloud indexing. Together, these layers allow OpenClay to perform the preference inference that cloud-based tools structurally cannot — because they reset with every session.
+
+As software creation costs approach zero and SaaS switching costs collapse, the new defensible moat is accumulated personal memory that lives on the user's hardware. OpenClay's memory grows with the user. It cannot be replicated by a competitor because it is the user's own data, history, and context — trained on their work, stored on their machine, owned by them entirely. The longer someone uses OpenClay, the more irreplaceable it becomes.
+
+**Citation:** KnowU-Bench: Evaluating Personalized Mobile Agents. arXiv:2604.08455, April 2026.
+
+---
+
+## 7. Clay Code
 
 Clay Code is the integrated development environment component of OpenClay. It provides:
 
@@ -114,7 +126,7 @@ Clay Code is the integrated development environment component of OpenClay. It pr
 
 ---
 
-## 7. Roadmap
+## 8. Roadmap
 
 - **v1.4** — Kokoro TTS integration for natural voice output
 - **v1.5** — Multi-device mesh networking (Meshtastic integration)
@@ -123,7 +135,7 @@ Clay Code is the integrated development environment component of OpenClay. It pr
 
 ---
 
-## 8. License & Distribution
+## 9. License & Distribution
 
 OpenClay Community Edition is open source under the MIT License.  
 OpenClay Pro (Clay Code + grant tools + priority support) is available via Gumroad.
