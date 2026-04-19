@@ -51,7 +51,7 @@ const MESH_GREEN = [39, 174, 96];
 function setup() {
   let canvas = createCanvas(windowWidth, windowHeight);
   canvas.parent("canvas-container");
-  baseRadius = min(width, height) * 0.16;
+  baseRadius = min(width, height) * 0.18;
   for (let i = 0; i < numPoints; i++) {
     clayPoints.push({
       angle: map(i, 0, numPoints, 0, TWO_PI),
@@ -104,6 +104,8 @@ function handleSend() {
 
   // Track user message in history
   if (typeof addToHistory === 'function') addToHistory('user', text);
+  // Show last query
+  if (typeof _showLastQuery === 'function') _showLastQuery(text);
 
   askOllama(inputText);
 }
@@ -147,6 +149,7 @@ function handleSendRaw(text, workflowPrompt) {
   canvasStatus = "";
   for (let i = 0; i < 15; i++) particles.push(makeParticle(width/2, currentCY || height*0.35));
   if (typeof addToHistory === 'function') addToHistory('user', text);
+  if (typeof _showLastQuery === 'function') _showLastQuery(text);
   askOllama(combined);
 }
 
@@ -223,6 +226,7 @@ async function askOllama(prompt) {
         state = "speaking";
         if (typeof addToHistory === 'function') addToHistory('assistant', data.response);
         if (typeof speakText === 'function') speakText(responseText);
+        if (typeof _hideLastQuery === 'function') _hideLastQuery();
         return;
       }
     }
@@ -257,6 +261,7 @@ async function askOllama(prompt) {
     if (state !== "speaking") state = "speaking";
     if (typeof addToHistory === 'function') addToHistory('assistant', fullText);
     if (typeof speakText === 'function') speakText(fullText);
+    if (typeof _hideLastQuery === 'function') _hideLastQuery();
   } catch (err) {
     if (err && err.name === 'AbortError') {
       // User cancelled — stay quiet, just return to idle
@@ -275,7 +280,7 @@ function draw() {
   breathPhase += 0.015;
 
   if (!animInited) {
-    let fullR = min(width, height) * 0.192;
+    let fullR = min(width, height) * 0.18;
     targetCY = height * 0.35; currentCY = height * 0.35;
     targetRadius = fullR; currentRadius = 0;
     animInited = true;
@@ -290,7 +295,7 @@ function draw() {
     CLAY_BASE[2] = lerp(morphFrom[2], morphTo[2], ease);
   }
 
-  let fullR = min(width, height) * 0.192;
+  let fullR = min(width, height) * 0.18;
   if (state === "speaking" || (state === "thinking" && responseText.length > 0)) {
     targetRadius = fullR * 0.5; targetCY = height * 0.18;
   } else if (state === "thinking") {
@@ -647,5 +652,5 @@ function updateParticles() {
 
 function windowResized() {
   resizeCanvas(windowWidth, windowHeight);
-  baseRadius = min(width, height) * 0.16;
+  baseRadius = min(width, height) * 0.18;
 }

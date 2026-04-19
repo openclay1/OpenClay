@@ -27,7 +27,12 @@
     #title h1 { font-family: 'Instrument Serif',Georgia,serif; font-style: italic;
       font-size: 2rem; font-weight: 400; color: var(--agent-color); line-height: 1.15;
       text-shadow: 0 2px 20px rgba(224,100,56,0.2); transition: color 600ms; }
-    #title p { font-size: 0.7rem; color: var(--faint); margin-top: 2px; letter-spacing: 0.05em; }
+    @keyframes subtitle-fade { 0%,80%{opacity:1} 100%{opacity:0} }
+    #title p { font-size: 0.7rem; color: var(--faint); margin-top: 2px; letter-spacing: 0.05em;
+      animation: subtitle-fade 5s forwards; will-change: opacity; }
+    #last-query { position: fixed; top: 72px; left: 0; right: 0; text-align: center;
+      font-size: 0.72rem; color: var(--faint); z-index: 10; pointer-events: none;
+      margin-top: 8px; opacity: 0; transition: opacity 0.5s; }
     #controls { position: fixed; bottom: 14px; left: 50%; transform: translateX(-50%);
       z-index: 10; width: calc(100vw - 24px); max-width: 560px; }
     #input-row { display: flex; gap: 4px; align-items: center; }
@@ -79,9 +84,13 @@
       background: var(--surface); transition: all var(--transition); text-align: left; }
     .agent-card:hover { border-color: var(--agent-color) !important; background: var(--accent-soft); }
     .agent-card.active { border-color: var(--agent-color) !important; background: var(--primary-highlight); }
-    /* Settings panel */
-    #settings-btn { position: fixed; top: 20px; right: 20px; z-index: 20; }
-    /* History button + panel */
+    /* Top-right nav group */
+    #top-right-nav { position: fixed; top: 16px; right: 16px; z-index: 20;
+      display: flex; align-items: center; gap: 12px; }
+    #top-right-nav #settings-btn,
+    #top-right-nav #history-btn { position: static; }
+    #top-right-nav #clay-code-btn { position: static; }
+    /* History panel */
     #history-btn { position: fixed; top: 20px; right: 94px; z-index: 20; }
     #history-overlay { display: none; position: fixed; inset: 0; z-index: 29; }
     #history-overlay.open { display: block; }
@@ -303,10 +312,10 @@
       font-size: 0.57rem; color: var(--faint); letter-spacing: 0.07em;
       pointer-events: none; }
     /* Clay Code button */
-    #clay-code-btn { position: fixed; top: 20px; right: 56px; z-index: 20;
-      background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-full);
-      padding: 5px 12px; font-family: inherit; font-size: 0.68rem; font-weight: 600;
-      color: #00FF9C; cursor: pointer; transition: all var(--transition); letter-spacing: 0.03em; }
+    #clay-code-btn { background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius-full); padding: 5px 12px; font-family: inherit;
+      font-size: 0.68rem; font-weight: 600; color: #00FF9C; cursor: pointer;
+      transition: all var(--transition); letter-spacing: 0.03em; white-space: nowrap; }
     #clay-code-btn:hover { background: rgba(0,255,156,0.08); border-color: #00FF9C; }
     /* Demo Mode toggle */
     #demo-mode-btn { position: fixed; top: 20px; left: 20px; z-index: 20;
@@ -486,13 +495,16 @@
 </head>
 <body>
   <div id="title"><h1>OpenClay</h1><p>COANA LABS &middot; LOCAL &middot; PRIVADO &middot; TUYO</p></div>
+  <div id="last-query"></div>
   <button id="demo-mode-btn" onclick="toggleDemoMode()" title="Demo Mode — smooth animations for screen recording">&#127916; Demo</button>
   <div id="rec-indicator"><span class="rec-dot"></span>REC</div>
   <button id="lang-btn" onclick="cycleLang()" title="Cambiar idioma / Change language">&#127758; <span id="lang-label">ES</span></button>
   <button id="projects-btn" onclick="toggleProjects()" title="Projects">&#128193;</button>
-  <button id="clay-code-btn" onclick="window.location='/claycode'" title="Clay Code — OpenClay Pro">&#60;/&#62;</button>
-  <button class="btn-icon" id="history-btn" onclick="toggleHistory()" title="Session history">&#128336;</button>
-  <button class="btn-icon" id="settings-btn" onclick="toggleSettings()">&#9881;</button>
+  <div id="top-right-nav">
+    <button id="clay-code-btn" onclick="window.location='/claycode'" title="Clay Code — OpenClay Pro">&#60;/&#62;</button>
+    <button class="btn-icon" id="history-btn" onclick="toggleHistory()" title="Session history">&#128336;</button>
+    <button class="btn-icon" id="settings-btn" onclick="toggleSettings()">&#9881;</button>
+  </div>
   <!-- Hardware welcome banner -->
   <div id="hw-banner">
     <div class="hw-msg" id="hw-banner-msg"></div>
@@ -538,13 +550,14 @@
         <button class="settings-tab active" onclick="switchTab('agents')" data-i18n="tabs.agents">Agentes</button>
         <button class="settings-tab" onclick="switchTab('sources')" data-i18n="tabs.sources">Fuentes</button>
         <button class="settings-tab" onclick="switchTab('memory')" data-i18n="tabs.memory">Memoria</button>
-        <button class="settings-tab" onclick="switchTab('history')" data-i18n="tabs.history">Historial</button>
+        <button class="settings-tab" onclick="switchTab('history')" data-i18n="tabs.history">Esta conversación</button>
         <button class="settings-tab" onclick="switchTab('logs')" data-i18n="tabs.logs">Registros</button>
         <button class="settings-tab" onclick="switchTab('exec')" data-i18n="tabs.exec">Sandbox</button>
         <button class="settings-tab" onclick="switchTab('mesh')" data-i18n="tabs.mesh">Red</button>
         <button class="settings-tab" onclick="switchTab('tasks')" data-i18n="tabs.tasks">Tareas</button>
         <button class="settings-tab" onclick="switchTab('models')" data-i18n="tabs.models">Modelos</button>
         <button class="settings-tab" onclick="switchTab('voice')" data-i18n="tabs.voice">Voz</button>
+        <button class="settings-tab" onclick="switchTab('orchestrate')">&#9889; Orquesta</button>
       </div>
       <!-- Agents -->
       <div id="tab-agents" class="tab-content active">
@@ -566,8 +579,12 @@
       </div>
       <!-- Memory -->
       <div id="tab-memory" class="tab-content">
-        <h3 data-i18n="persistentMemory">Memoria persistente (Mem0)</h3>
-        <div id="memory-list" style="max-height:calc(100vh - 300px);overflow-y:auto;"></div>
+        <div style="margin-bottom:10px;display:flex;align-items:center;justify-content:space-between;">
+          <span id="mem-count" style="font-size:0.72rem;color:var(--muted);">Clay remembers 0 things</span>
+          <button onclick="saveConvToMemory()" class="settings-action primary" style="font-size:0.68rem;padding:4px 10px;">&#128190; Save conversation</button>
+        </div>
+        <input type="text" id="mem-search" placeholder="Search memories..." style="width:100%;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius-md);padding:6px 10px;font-family:inherit;font-size:0.75rem;color:var(--text);outline:none;margin-bottom:8px;" oninput="filterMemories(this.value)">
+        <div id="memory-list" style="max-height:calc(100vh - 380px);overflow-y:auto;"></div>
         <div id="research-context" style="display:none;">
           <h3 data-i18n="researchContext">Contexto de investigaci&oacute;n (Hindsight)</h3>
           <div id="rc-factual" class="rc-network"><h4 data-i18n="knownFacts">Hechos conocidos</h4></div>
@@ -581,7 +598,7 @@
       </div>
       <!-- History -->
       <div id="tab-history" class="tab-content">
-        <h3 data-i18n="recentConversations">Conversaciones recientes</h3>
+        <h3 data-i18n="recentConversations">Esta conversación</h3>
         <div id="session-history-list" style="max-height:calc(100vh - 200px);overflow-y:auto;"></div>
       </div>
       <!-- Logs -->
@@ -660,6 +677,25 @@
           <button onclick="saveVoicePreference()" class="settings-action primary" style="flex:1;" data-i18n="save">Guardar</button>
         </div>
         <div style="margin-top:12px;font-size:0.68rem;color:var(--faint);" id="tts-engine-label"></div>
+      </div>
+      <!-- Orchestrate tab -->
+      <div id="tab-orchestrate" class="tab-content">
+        <h3>Agentes</h3>
+        <div id="agent-roster" style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;"></div>
+        <h3 style="margin-top:16px;">Multi-Agent Task</h3>
+        <textarea id="orch-goal" placeholder="Describe what you want done..." style="width:100%;min-height:64px;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius-md);padding:8px 10px;font-family:inherit;font-size:0.75rem;color:var(--text);outline:none;resize:vertical;margin-bottom:6px;"></textarea>
+        <div id="orch-agent-checks" style="display:flex;flex-wrap:wrap;gap:6px;margin:8px 0;"></div>
+        <button onclick="runOrchestration()" class="settings-action primary" style="width:100%;">&#9654; Run Chain</button>
+        <div id="orch-progress" style="display:none;margin-top:10px;font-size:0.72rem;color:var(--muted);border:1px solid var(--border);border-radius:var(--radius-md);padding:8px 10px;max-height:200px;overflow-y:auto;"></div>
+        <h3 style="margin-top:16px;">Recent Tasks</h3>
+        <div id="orch-recent" style="max-height:180px;overflow-y:auto;"></div>
+        <div style="position:relative;margin-top:16px;opacity:0.5;pointer-events:none;">
+          <h3>Scheduled Tasks</h3>
+          <p style="font-size:0.72rem;color:var(--muted);">Run agents on a schedule automatically</p>
+          <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(22,19,16,0.7);border-radius:8px;pointer-events:all;">
+            <a href="https://coanalabs.gumroad.com/l/openclay-pro" target="_blank" style="background:var(--primary);color:#fff;border-radius:var(--radius-full);padding:6px 14px;font-size:0.72rem;text-decoration:none;font-weight:500;">&#128274; Upgrade to Pro</a>
+          </div>
+        </div>
       </div>
       <br><button onclick="toggleSettings()" class="settings-action secondary" data-i18n="close">Cerrar</button>
     </div>
@@ -1056,6 +1092,9 @@
       document.getElementById('tab-'+name).classList.add('active');
       if (name === 'models') loadModels();
       if (name === 'voice') _loadVoices();
+      if (name === 'memory') loadMemories();
+      if (name === 'orchestrate') loadOrchestration();
+      if (name === 'history') renderHistory();
     }
 
     // ═══ Model recommendations ═══
@@ -1129,23 +1168,44 @@
 
     // ═══ Agents ═══
     async function loadAgents(){
+      const el = document.getElementById('agents-list');
+      if (!el) return;
       try{
-        const r=await fetch('/api/agents',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'});
-        const d=await r.json();
-        const el=document.getElementById('agents-list'); el.innerHTML='';
-        console.log('rendering agents', d.agents);
-        (d.agents||[]).forEach(a=>{
-          const card=document.createElement('div');
-          card.className='agent-card'+(a.active?' active':'');
-          card.style.borderColor = a.active ? (a.color_accent||'var(--agent-color)') : '';
-          card.innerHTML='<div class="ac-name"><span class="ac-dot" style="background:'+a.color_accent+'"></span>'+escapeHtml(a.name)+'</div><div class="ac-desc">'+escapeHtml(a.description||'')+(a.workflows?' \u00B7 '+a.workflows+' workflows':'')+'</div>';
+        const r = await fetch('/api/agents', {method:'POST', headers:{'Content-Type':'application/json'}, body:'{}'});
+        if (!r.ok) throw new Error('HTTP ' + r.status);
+        const d = await r.json();
+        console.log('agents raw response:', d);
+        const agents = d.agents || [];
+        el.innerHTML = '';
+        if (!agents.length) {
+          el.innerHTML = '<p style="font-size:0.78rem;color:var(--faint);padding:12px 0;">No agents found — check agents/ folder</p>';
+          return;
+        }
+        agents.forEach(a => {
+          const accentColor = a.color_accent || '#e06438';
+          const card = document.createElement('div');
+          card.className = 'agent-card' + (a.active ? ' active' : '');
+          card.style.cssText = 'border-left: 3px solid ' + accentColor + '; padding: 10px 12px; margin-bottom: 8px; cursor: pointer;';
+          if (a.active) card.style.background = 'var(--primary-highlight)';
+          card.innerHTML =
+            '<div class="ac-name" style="font-size:15px;font-weight:700;display:flex;align-items:center;gap:7px;">' +
+              '<span class="ac-dot" style="width:8px;height:8px;border-radius:50%;background:' + accentColor + ';flex-shrink:0;"></span>' +
+              escapeHtml(a.name) +
+            '</div>' +
+            '<div class="ac-desc" style="font-size:12px;color:var(--muted);margin-top:3px;">' +
+              escapeHtml(a.description || '') +
+              (a.workflows ? ' · ' + a.workflows + ' workflows' : '') +
+            '</div>';
           card.addEventListener('click', function(){
-            console.log('agent clicked', a.name);
+            console.log('agent selected:', a.name);
             selectAgent(a.name);
           });
           el.appendChild(card);
         });
-      }catch(e){console.error('loadAgents error', e);}
+      } catch(e) {
+        console.error('loadAgents error', e);
+        el.innerHTML = '<p style="font-size:0.78rem;color:var(--faint);padding:12px 0;">Error loading agents — ' + escapeHtml(e.message) + '</p>';
+      }
     }
     const _AGENT_CYCLE = [
       {name:'Clay General',   color:'#e06438'},
@@ -1167,21 +1227,43 @@
         const r=await fetch('/api/agents/select',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name})});
         const d=await r.json();
         if(d.ok){
-          setAgentColor(d.color_accent||'#e06438');
+          const color = d.color_accent || '#e06438';
+          setAgentColor(color);
           loadWorkflows(d.workflows||[]);
           if(d.disclaimer){
             document.getElementById('disclaimer').textContent=d.disclaimer;
             document.getElementById('disclaimer').classList.add('visible');
             setTimeout(()=>document.getElementById('disclaimer').classList.remove('visible'),6000);
           }
-          if(typeof triggerAgentMorph==='function') triggerAgentMorph(d.color_accent);
+          if(typeof triggerAgentMorph==='function') triggerAgentMorph(color);
+          // Persist active agent to localStorage
+          localStorage.setItem('clay_active_agent', JSON.stringify({name, color}));
+          // Update status label
+          const memStatus = document.getElementById('memory-status');
+          if (memStatus) {
+            const parts = memStatus.textContent.split(' · ');
+            parts[parts.length - 1] = name;
+            memStatus.textContent = parts.join(' · ');
+            memStatus.title = 'Active: ' + name + ' — click to switch';
+          }
           loadAgents();
-          showBadge('agent',name,false);
+          showBadge('agent', name, false);
           // Close settings panel after selecting
           if(settingsOpen) toggleSettings();
         }
       }catch(e){console.error('selectAgent error',e);}
     }
+
+    // Restore active agent from localStorage on load
+    (function _restoreAgent(){
+      try {
+        const saved = JSON.parse(localStorage.getItem('clay_active_agent') || 'null');
+        if (saved && saved.name) {
+          // Restore color immediately (no API call needed on paint)
+          setTimeout(() => selectAgent(saved.name), 500);
+        }
+      } catch(e) {}
+    })();
     function setAgentColor(hex){
       currentAgentColor=hex;
       document.documentElement.style.setProperty('--agent-color',hex);
@@ -1295,13 +1377,26 @@
         const d=await r.json();
         const el=document.getElementById('memory-list'); el.innerHTML='';
         const mems=d.memories||[];
-        if(!mems.length){el.innerHTML='<p style="font-size:0.78rem;color:var(--faint);padding:12px 0;text-align:center;">Sin memorias a\u00FAn. Habla con OpenClay para crear memorias.</p>';return;}
-        mems.forEach(m=>{
-          const text=m.memory||m.text||JSON.stringify(m);
-          const id=m.id||'';
-          const div=document.createElement('div'); div.className='mem-item';
-          div.innerHTML='<span class="mem-text">'+escapeHtml(text)+'</span>'+(id?'<button class="mem-del" onclick="deleteMemory(\''+id+'\')">borrar</button>':'');
-          el.appendChild(div);
+        // Update count
+        const countEl=document.getElementById('mem-count');
+        if(countEl) countEl.textContent='Clay remembers '+mems.length+' thing'+(mems.length!==1?'s':'')+' about you';
+        if(!mems.length){el.innerHTML='<p style="font-size:0.78rem;color:var(--faint);padding:12px 0;text-align:center;">Sin memorias aún. Habla con OpenClay para crear memorias.</p>';return;}
+        // Category keyword matching
+        const CATS={Work:['work','project','task','meeting','report','research','study','analyze'],Preferences:['prefer','like','love','hate','want','enjoy','always','never'],Projects:['openclay','coana','document','file','data','code'],People:['person','team','user','client','contact']};
+        function inferCategory(text){const t=text.toLowerCase();for(const[cat,kws]of Object.entries(CATS)){if(kws.some(k=>t.includes(k)))return cat;}return'General';}
+        const groups={};
+        mems.forEach(m=>{const text=m.memory||m.text||JSON.stringify(m);const cat=inferCategory(text);if(!groups[cat])groups[cat]=[];groups[cat].push({text,id:m.id||''});});
+        _allMemoryCards=[];
+        Object.entries(groups).forEach(([cat,items])=>{
+          const gh=document.createElement('div');
+          gh.innerHTML='<div style="font-size:0.65rem;color:var(--primary);letter-spacing:0.06em;text-transform:uppercase;margin:8px 0 4px;font-weight:600;">'+escapeHtml(cat)+'</div>';
+          el.appendChild(gh);
+          items.forEach(({text,id})=>{
+            const div=document.createElement('div'); div.className='mem-item';
+            div.innerHTML='<span class="mem-text">'+escapeHtml(text)+'</span>'+(id?'<button class="mem-del" onclick="deleteMemory(\''+id+'\')">borrar</button>':'');
+            el.appendChild(div);
+            _allMemoryCards.push({el:div,text});
+          });
         });
         // Load research context if in research mode
         loadResearchContext();
@@ -1426,6 +1521,106 @@
       if(typeof setClayState==='function') setClayState('idle');
     }
 
+    // ═══ Memory tab helpers ═══
+    let _allMemoryCards = [];
+    function filterMemories(query){
+      const q=query.toLowerCase();
+      _allMemoryCards.forEach(({el,text})=>{
+        el.style.display=(q===''||text.toLowerCase().includes(q))?'':'none';
+      });
+    }
+    async function saveConvToMemory(){
+      if(!localHistory||!localHistory.length){showBadge('mem','No conversation yet',true);setTimeout(()=>removeBadge('mem'),2000);return;}
+      const text=localHistory.map(e=>(e.role==='user'?'User: ':'Clay: ')+e.content).join('\n');
+      try{
+        await fetch('/api/memories',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text})});
+        showBadge('mem','✓ Saved to memory',false);setTimeout(()=>removeBadge('mem'),2000);
+        loadMemories();
+      }catch(e){showBadge('mem','✗ Error saving',true);setTimeout(()=>removeBadge('mem'),2000);}
+    }
+
+    // ═══ Orchestration ═══
+    let _orchSelectedAgents=new Set();
+    async function loadOrchestration(){
+      await renderAgentRoster();
+      await loadOrchRecentTasks();
+    }
+    async function renderAgentRoster(){
+      const roster=document.getElementById('agent-roster');
+      const checks=document.getElementById('orch-agent-checks');
+      if(!roster)return;
+      try{
+        const r=await fetch('/api/agents',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'});
+        const d=await r.json();
+        const agents=d.agents||[];
+        roster.innerHTML='';
+        checks.innerHTML='';
+        agents.forEach(a=>{
+          const isActive=a.active;
+          const card=document.createElement('div');
+          card.style.cssText='background:var(--surface);border:1px solid '+(isActive?a.color_accent:'var(--border)')+';border-radius:var(--radius-lg);padding:8px 10px;cursor:pointer;transition:all 0.18s;'+(isActive?'box-shadow:0 0 8px '+a.color_accent+'44;':'');
+          card.innerHTML='<div style="display:flex;align-items:center;gap:5px;margin-bottom:4px;"><span style="width:7px;height:7px;border-radius:50%;background:'+a.color_accent+';flex-shrink:0;"></span><span style="font-size:0.75rem;font-weight:600;color:var(--text);">'+escapeHtml(a.name)+'</span>'+(isActive?'<span style="font-size:0.55rem;background:'+a.color_accent+'22;color:'+a.color_accent+';border-radius:9999px;padding:1px 5px;margin-left:auto;">Active</span>':'')+'</div><div style="font-size:0.65rem;color:var(--muted);">'+escapeHtml(a.description||'')+'</div><button style="margin-top:6px;font-size:0.65rem;padding:2px 8px;background:var(--primary);color:#fff;border:none;border-radius:9999px;cursor:pointer;" onclick="selectAgent(\''+a.name+'\')">&#9654; Activate</button>';
+          roster.appendChild(card);
+          // Checkbox for chain
+          const lbl=document.createElement('label');
+          lbl.style.cssText='display:flex;align-items:center;gap:4px;font-size:0.7rem;color:var(--text);background:var(--surface);border:1px solid var(--border);border-radius:9999px;padding:3px 10px;cursor:pointer;';
+          const chk=document.createElement('input');chk.type='checkbox';chk.value=a.name;
+          chk.onchange=()=>{if(chk.checked)_orchSelectedAgents.add(a.name);else _orchSelectedAgents.delete(a.name);};
+          lbl.appendChild(chk);lbl.appendChild(document.createTextNode(a.name));
+          checks.appendChild(lbl);
+        });
+      }catch(e){roster.innerHTML='<p style="font-size:0.72rem;color:var(--faint);">Error loading agents</p>';}
+    }
+    async function runOrchestration(){
+      const goal=document.getElementById('orch-goal').value.trim();
+      if(!goal){showBadge('orch','Enter a goal',true);setTimeout(()=>removeBadge('orch'),2000);return;}
+      const agents=[..._orchSelectedAgents];
+      if(!agents.length){showBadge('orch','Select at least one agent',true);setTimeout(()=>removeBadge('orch'),2000);return;}
+      const prog=document.getElementById('orch-progress');
+      prog.style.display='block';prog.innerHTML='<span style="color:var(--muted);">Running chain...</span>';
+      try{
+        const r=await fetch('/api/orchestrate',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({goal,agents})});
+        const d=await r.json();
+        if(d.error){prog.innerHTML='<span style="color:#c0392b;">'+escapeHtml(d.error)+'</span>';return;}
+        prog.innerHTML='';
+        (d.results||[]).forEach(res=>{
+          const div=document.createElement('div');
+          div.style.cssText='margin-bottom:10px;border-left:3px solid '+res.color+';padding-left:8px;';
+          div.innerHTML='<div style="font-size:0.68rem;font-weight:600;color:'+res.color+';">'+escapeHtml(res.agent)+'</div><div style="font-size:0.72rem;color:var(--text);margin-top:3px;white-space:pre-wrap;">'+escapeHtml(res.output)+'</div>';
+          prog.appendChild(div);
+        });
+        loadOrchRecentTasks();
+      }catch(e){prog.innerHTML='<span style="color:#c0392b;">Error: '+escapeHtml(e.message)+'</span>';}
+    }
+    async function loadOrchRecentTasks(){
+      const el=document.getElementById('orch-recent');if(!el)return;
+      try{
+        const r=await fetch('/api/orchestrate/list');
+        const d=await r.json();
+        const items=d.orchestrations||[];
+        if(!items.length){el.innerHTML='<p style="font-size:0.72rem;color:var(--faint);">No recent chains</p>';return;}
+        el.innerHTML='';
+        items.slice(0,5).forEach(o=>{
+          const div=document.createElement('div');
+          div.style.cssText='padding:6px 0;border-bottom:1px solid var(--divider);font-size:0.72rem;';
+          div.innerHTML='<span style="color:var(--text);">'+escapeHtml(o.goal.substring(0,60))+'</span> <span style="color:var(--faint);">'+escapeHtml((o.agents||[]).join(', '))+'</span>';
+          el.appendChild(div);
+        });
+      }catch(e){}
+    }
+
+    // ═══ Last query display ═══
+    function _showLastQuery(text){
+      const el=document.getElementById('last-query');if(!el)return;
+      const words=text.trim().split(/\s+/).slice(0,8).join(' ');
+      el.textContent=words+(text.trim().split(/\s+/).length>8?'…':'');
+      el.style.opacity='1';
+    }
+    function _hideLastQuery(){
+      const el=document.getElementById('last-query');if(!el)return;
+      el.style.opacity='0';
+    }
+
     // ═══ Workflow send ═══
     window.handleSendWithWorkflow = function(text, workflowPrompt) {
       if(typeof handleSendRaw === 'function') handleSendRaw(text, workflowPrompt);
@@ -1464,11 +1659,11 @@
         const el=document.getElementById('memory-status');
         let parts=[];
         if(d.wiki_pages>0) parts.push('\uD83D\uDCAD wiki: '+d.wiki_pages);
-        if(d.memory_count>0) parts.push('\uD83E\udDE0 '+d.memory_count+' memories');
+        if(d.memory_count>0) parts.push('\uD83E\udDE0 <span style="cursor:pointer;text-decoration:underline dotted;" onclick="event.stopPropagation();toggleSettings();switchTab(\'memory\')" title="Open memory tab">'+d.memory_count+' memories</span>');
         if(d.log_entries>0) parts.push('\uD83D\uDCDD '+d.log_entries+' log');
         const agentName=d.agent||'Clay General';
         parts.push(agentName);
-        el.textContent=parts.join(' \u00B7 ');
+        el.innerHTML=parts.join(' \u00B7 ');
         el.title='Active: '+agentName+' — click to switch';
         const _cidx=_AGENT_CYCLE.findIndex(a=>a.name===agentName);
         if(_cidx>=0) _agentCycleIdx=_cidx;

@@ -75,6 +75,8 @@ _log_last_hash = "genesis"
 _execution_history = []
 _active_tasks = {}      # id -> task dict
 _task_threads = {}      # id -> thread
+_session_id = str(uuid.uuid4())[:8]   # unique ID per server start
+CONV_DIR = BASE_DIR / "projects" / "conversations"
 
 # ── Hardware Detection ───────────────────────────────────────────
 def _detect_hardware():
@@ -138,6 +140,10 @@ def _detect_hardware():
         profile["estimated_response_time"] = "3–8 seconds"
     else:
         profile["estimated_response_time"] = "20–40 seconds"
+    # Best coder model
+    coder_candidates = ["devstral:latest", "qwen2.5-coder:14b", "qwen2.5-coder:7b"]
+    installed = set(profile.get("ollama_models", []))
+    profile["best_coder_model"] = next((m for m in coder_candidates if any(m.split(":")[0] in i for i in installed)), "qwen2.5:3b")
     # Check for Kokoro TTS
     kokoro_path = BASE_DIR / "models" / "kokoro-82m"
     profile["tts_engine"] = "kokoro" if kokoro_path.exists() else "browser"
@@ -1632,24 +1638,46 @@ def _build_system_prompt(query=""):
     if _connected_folders:
         folder_list = ", ".join(_connected_folders)
         parts.append(f"\n\n## Connected Directories\nThe user has granted access to: {folder_list}.")
-    # Mem0 relevant memories
+    # ── CONTEXT FROM YOUR MEMORY (all agents) ──────────────────────
     if query:
-        memories = _memory_search(query, limit=5)
-        if memories:
-            mem_texts = []
-            for m in memories:
-                text = m.get("memory", m.get("text", str(m))) if isinstance(m, dict) else str(m)
-                if text: mem_texts.append(f"- {text}")
-            if mem_texts:
-                parts.append("\n\n## Persistent Memory (things you remember about this user):\n" + "\n".join(mem_texts))
-    # Research memory (Hindsight) if in research mode
-    if _current_agent and _current_agent.get("memory_backend") == "hindsight" and query:
-        for network in ["factual", "experiential", "beliefs"]:
-            items = _research_search(network, query, n=3)
-            if items:
-                texts = [r["text"] for r in items]
-                labels = {"factual": "Known Facts", "experiential": "Past Sessions", "beliefs": "Inferred Goals"}
-                parts.append(f"\n\n## Research Context — {labels[network]}:\n" + "\n".join(f"- {t}" for t in texts))
+        # WHO YOU ARE TALKING TO
+        soul_line = _soul_text.strip() if _soul_text else "No profile set yet"
+        # WHAT YOU REMEMBER — Mem0 top-5
+        mem_lines = []
+        try:
+            memories = _memory_search(query, limit=5)
+            if memories:
+                for m in memories:
+                    text = m.get("memory", m.get("text", str(m))) if isinstance(m, dict) else str(m)
+                    if text: mem_lines.append(f"- {text}")
+        except Exception:
+            pass
+        mem_block = "\n".join(mem_lines) if mem_lines else "No specific memories yet — pay attention and learn"
+        # RELEVANT KNOWLEDGE — Hindsight factual
+        fact_lines = []
+        try:
+            factual = _research_search("factual", query, n=3)
+            if factual:
+                fact_lines = [f"- {r['text']}" for r in factual]
+        except Exception:
+            pass
+        # Experiential + beliefs only if the agent explicitly enables hindsight
+        if _current_agent and _current_agent.get("memory_backend") == "hindsight":
+            for network in ["experiential", "beliefs"]:
+                try:
+                    items = _research_search(network, query, n=3)
+                    if items:
+                        labels = {"experiential": "Past Sessions", "beliefs": "Inferred Goals"}
+                        fact_lines += [f"[{labels[network]}] {r['text']}" for r in items]
+                except Exception:
+                    pass
+        context_block = (
+            f"\n\n## WHO YOU ARE TALKING TO:\n{soul_line}"
+            f"\n\n## WHAT YOU REMEMBER ABOUT THIS PERSON:\n{mem_block}"
+        )
+        if fact_lines:
+            context_block += "\n\n## RELEVANT KNOWLEDGE FROM THEIR FILES:\n" + "\n".join(fact_lines)
+        parts.append(context_block)
     # Preferences
     prefs = MEMORY_DIR / "preferences.md"
     if prefs.exists():
@@ -1659,6 +1687,20 @@ def _build_system_prompt(query=""):
     if wiki_context:
         parts.append(f"\n\n## Relevant wiki:\n{wiki_context}")
     return "\n".join(parts)
+
+# ── Conversation persistence ─────────────────────────────────────
+def _save_conversation_turn(user_msg: str, assistant_msg: str):
+    """Append user + assistant turn to today's .jsonl conversation file."""
+    try:
+        CONV_DIR.mkdir(parents=True, exist_ok=True)
+        today = datetime.now().strftime("%Y-%m-%d")
+        path = CONV_DIR / f"{today}-{_session_id}.jsonl"
+        now = datetime.now().isoformat()
+        with open(path, "a", encoding="utf-8") as f:
+            f.write(json.dumps({"role": "user", "content": user_msg, "timestamp": now}, ensure_ascii=False) + "\n")
+            f.write(json.dumps({"role": "assistant", "content": assistant_msg, "timestamp": now}, ensure_ascii=False) + "\n")
+    except Exception as e:
+        print(f"  [conv] save error: {e}")
 
 # ── Wiki (Karpathy Layer 1) ──────────────────────────────────────
 def _get_relevant_wiki(query=""):
@@ -1892,6 +1934,8 @@ class ClayHandler(http.server.SimpleHTTPRequestHandler):
             "/api/projects/list": self._handle_project_list,
             # Models
             "/api/models/install": self._handle_model_install,
+            # Orchestration
+            "/api/orchestrate": self._handle_orchestrate,
         }
         # Dynamic POST routes (path contains variable segments)
         if re.match(r"^/api/projects/[^/]+/rename$", self.path):
@@ -1944,6 +1988,49 @@ class ClayHandler(http.server.SimpleHTTPRequestHandler):
         # Model recommendations
         if self.path == "/api/models/recommendations":
             self._handle_model_recommendations()
+            return
+        # Orchestration list
+        if self.path == "/api/orchestrate/list":
+            ORCH_DIR = BASE_DIR / "projects" / "orchestrations"
+            ORCH_DIR.mkdir(parents=True, exist_ok=True)
+            files = sorted(ORCH_DIR.glob("*.json"), reverse=True)[:10]
+            results = []
+            for f in files:
+                try:
+                    results.append(json.loads(f.read_text("utf-8")))
+                except Exception:
+                    pass
+            self._send_json({"orchestrations": results})
+            return
+        # Conversations list
+        if self.path == "/api/conversations":
+            CONV_DIR.mkdir(parents=True, exist_ok=True)
+            files = sorted(CONV_DIR.glob("*.jsonl"), reverse=True)
+            self._send_json({"conversations": [f.name for f in files]})
+            return
+        # Conversation file contents
+        if self.path.startswith("/api/conversations/"):
+            fname = self.path.split("/api/conversations/")[1].strip("/")
+            fpath = CONV_DIR / fname
+            if fpath.exists() and fpath.suffix == ".jsonl":
+                lines = [json.loads(l) for l in fpath.read_text("utf-8").splitlines() if l.strip()]
+                self._send_json({"turns": lines})
+            else:
+                self._send_json({"error": "not found"}, 404)
+            return
+        # Public whitepaper
+        if self.path == "/docs/openclay_public_whitepaper.md":
+            wp = BASE_DIR / "docs" / "openclay_public_whitepaper.md"
+            if wp.exists():
+                content = wp.read_bytes()
+                self.send_response(200)
+                self.send_header("Content-Type", "text/plain; charset=utf-8")
+                self.send_header("Access-Control-Allow-Origin", "*")
+                self.send_header("Content-Length", str(len(content)))
+                self.end_headers()
+                self.wfile.write(content)
+            else:
+                self.send_error(404)
             return
         # Clay Code Pro routes
         if self.path == "/claycode":
@@ -2007,6 +2094,7 @@ class ClayHandler(http.server.SimpleHTTPRequestHandler):
             # Research memory if applicable
             if _current_agent and _current_agent.get("memory_backend") == "hindsight":
                 _extract_research_insights(prompt, result)
+            _save_conversation_turn(body.get("prompt", ""), result)
             self._send_json({"response": result, "done": True}); return
 
         # Simple mode — streaming
@@ -2054,6 +2142,7 @@ class ClayHandler(http.server.SimpleHTTPRequestHandler):
                 _update_preferences(prompt, full_response)
                 if _current_agent and _current_agent.get("memory_backend") == "hindsight":
                     _extract_research_insights(prompt, full_response)
+                _save_conversation_turn(body.get("prompt", ""), full_response)
         except urllib.error.URLError as e:
             print(f"  [engine] streaming call failed: {e}")
             # Silent recovery attempt
@@ -2276,6 +2365,9 @@ class ClayHandler(http.server.SimpleHTTPRequestHandler):
 
     def _handle_agents(self):
         self._read_body()
+        # Lazy-load agents if not yet loaded (e.g. first request before main() completes)
+        if not _agents:
+            _load_agents()
         agent_list = []
         for name, cfg in _agents.items():
             agent_list.append({
@@ -2300,6 +2392,42 @@ class ClayHandler(http.server.SimpleHTTPRequestHandler):
             "disclaimer": agent.get("disclaimer", ""),
             "workflows": agent.get("workflows", [])
         })
+
+    def _handle_orchestrate(self):
+        body = json.loads(self._read_body())
+        goal = body.get("goal", "")
+        agent_names = body.get("agents", [])
+        if not goal or not agent_names:
+            self._send_json({"error": "missing goal or agents"}, 400); return
+        results = []
+        prev_output = ""
+        for name in agent_names:
+            agent = _agents.get(name)
+            if not agent: continue
+            sys_prompt = agent.get("system_prompt", "")
+            if prev_output:
+                sys_prompt += f"\n\nPrevious agent output:\n{prev_output}"
+            try:
+                req = urllib.request.Request(
+                    f"{OLLAMA_URL}/api/generate",
+                    data=json.dumps({"model": _get_best_model(), "prompt": goal,
+                        "system": sys_prompt, "stream": False}).encode(),
+                    headers={"Content-Type": "application/json"})
+                resp = urllib.request.urlopen(req, timeout=60)
+                result_text = json.loads(resp.read()).get("response", "")
+            except Exception as e:
+                result_text = f"[Error: {e}]"
+            prev_output = result_text
+            results.append({"agent": name, "color": agent.get("color_accent", "#e06438"), "output": result_text})
+        # Save to disk
+        ORCH_DIR = BASE_DIR / "projects" / "orchestrations"
+        ORCH_DIR.mkdir(parents=True, exist_ok=True)
+        ts = datetime.now().strftime("%Y%m%d-%H%M%S")
+        (ORCH_DIR / f"{ts}.json").write_text(json.dumps({
+            "goal": goal, "agents": agent_names, "results": results,
+            "timestamp": datetime.now().isoformat()
+        }, ensure_ascii=False, indent=2), "utf-8")
+        self._send_json({"ok": True, "results": results})
 
     def _handle_workflows(self):
         self._read_body()
@@ -2738,10 +2866,13 @@ def main():
     _model_health_check()
     _start_model_health_thread()
     # Load agents
+    _load_agents()
     if _agents:
         names = ", ".join(_agents.keys())
         active = _current_agent.get("name", "?") if _current_agent else "?"
         print(f"  Agents: {names} (active: {active})")
+    else:
+        print("  [warning] No agents found — check agents/ folder")
     # Init Mem0
     print("  Memory...", end=" ", flush=True)
     if _init_mem0():
