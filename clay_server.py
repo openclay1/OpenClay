@@ -9,6 +9,15 @@ import urllib.request, urllib.error
 from datetime import datetime
 from pathlib import Path
 
+# Load .env if present
+_env_file = Path(__file__).parent / ".env"
+if _env_file.exists():
+    for _line in _env_file.read_text().splitlines():
+        _line = _line.strip()
+        if _line and not _line.startswith('#') and '=' in _line:
+            _k, _, _v = _line.partition('=')
+            os.environ.setdefault(_k.strip(), _v.strip().strip('"\''))
+
 PORT = 3000
 OLLAMA_URL = "http://localhost:11434"
 PREFERRED_MODELS = ["qwen2.5:3b-instruct-q4_K_M", "qwen2.5:3b", "llama3.2:3b",
@@ -77,6 +86,24 @@ _active_tasks = {}      # id -> task dict
 _task_threads = {}      # id -> thread
 _session_id = str(uuid.uuid4())[:8]   # unique ID per server start
 CONV_DIR = BASE_DIR / "projects" / "conversations"
+
+# ── Pro license ──────────────────────────────────────────────────
+PRO_ACTIVE = False
+_OPENCLAY_DIR = Path.home() / ".openclay"
+_LICENSE_FILE = _OPENCLAY_DIR / "license.json"
+
+def _load_pro_license():
+    global PRO_ACTIVE
+    try:
+        if _LICENSE_FILE.exists():
+            data = json.loads(_LICENSE_FILE.read_text("utf-8"))
+            if data.get("pro") is True:
+                PRO_ACTIVE = True
+    except Exception:
+        pass
+
+# Load on module init
+_load_pro_license()
 
 # ── Hardware Detection ───────────────────────────────────────────
 def _detect_hardware():
@@ -357,11 +384,17 @@ def _memory_add(text, user_id="local_user"):
 def _memory_search(query, user_id="local_user", limit=5):
     if not _mem0_client: return []
     try:
-        results = _mem0_client.search(query, user_id=user_id, limit=limit)
+        # Try hybrid search (mem0 >= 0.1.50)
+        try:
+            results = _mem0_client.search(query, user_id=user_id, limit=limit, search_type="hybrid")
+        except TypeError:
+            results = _mem0_client.search(query, user_id=user_id, limit=limit)
         if isinstance(results, dict):
             return results.get("results", results.get("memories", []))
         return results if isinstance(results, list) else []
-    except Exception: return []
+    except Exception as e:
+        print(f"  [memory] search failed: {e}")
+        return []
 
 def _memory_get_all(user_id="local_user"):
     if not _mem0_client: return []
@@ -1929,6 +1962,7 @@ class ClayHandler(http.server.SimpleHTTPRequestHandler):
             "/api/tasks/demo": self._handle_demo_tasks,
             # Pro
             "/api/pro/waitlist": self._handle_pro_waitlist,
+            "/api/activate-pro": self._handle_activate_pro,
             # Projects
             "/api/projects/save": self._handle_project_save,
             "/api/projects/list": self._handle_project_list,
@@ -2018,6 +2052,10 @@ class ClayHandler(http.server.SimpleHTTPRequestHandler):
             else:
                 self._send_json({"error": "not found"}, 404)
             return
+        # Pro status
+        if self.path == "/api/pro-status":
+            self._handle_pro_status()
+            return
         # Public whitepaper
         if self.path == "/docs/openclay_public_whitepaper.md":
             wp = BASE_DIR / "docs" / "openclay_public_whitepaper.md"
@@ -2045,6 +2083,18 @@ class ClayHandler(http.server.SimpleHTTPRequestHandler):
         if self.path == "/api/memory/export":
             self._handle_memory_export()
             return
+        # Serve index.html with CSP header
+        if self.path in ('/', '/index.html'):
+            index_path = BASE_DIR / "index.html"
+            if index_path.exists():
+                content = index_path.read_bytes()
+                self.send_response(200)
+                self.send_header("Content-Type", "text/html; charset=utf-8")
+                self._send_csp_headers()
+                self.send_header("Content-Length", str(len(content)))
+                self.end_headers()
+                self.wfile.write(content)
+                return
         # Fall through to static file serving
         super().do_GET()
 
@@ -2064,6 +2114,9 @@ class ClayHandler(http.server.SimpleHTTPRequestHandler):
         body = json.loads(self._read_body())
         prompt = body.get("prompt", "")
         if not prompt: return self.send_error(400)
+        # Input validation
+        if len(prompt) > 10000:
+            self._send_json({"error": "Message too long (max 10,000 chars)"}); return
 
         # Commands
         if prompt.strip().lower() == "/agentic":
@@ -2143,6 +2196,17 @@ class ClayHandler(http.server.SimpleHTTPRequestHandler):
                 if _current_agent and _current_agent.get("memory_backend") == "hindsight":
                     _extract_research_insights(prompt, full_response)
                 _save_conversation_turn(body.get("prompt", ""), full_response)
+                # Tag factual responses with metadata
+                if full_response and _mem0_client:
+                    agent_name = _current_agent.get("name", "Clay") if _current_agent else "Clay"
+                    try:
+                        _mem0_client.add(
+                            f"Clay ({agent_name}) said: {full_response[:500]}",
+                            user_id="local_user",
+                            metadata={"type": "response", "agent": agent_name}
+                        )
+                    except Exception:
+                        pass
         except urllib.error.URLError as e:
             print(f"  [engine] streaming call failed: {e}")
             # Silent recovery attempt
@@ -2399,6 +2463,10 @@ class ClayHandler(http.server.SimpleHTTPRequestHandler):
         agent_names = body.get("agents", [])
         if not goal or not agent_names:
             self._send_json({"error": "missing goal or agents"}, 400); return
+        # Security: only allow known agent names
+        agent_names = [n for n in agent_names if n in _agents]
+        if not agent_names:
+            self._send_json({"error": "No valid agents specified"}); return
         results = []
         prev_output = ""
         for name in agent_names:
@@ -2531,6 +2599,7 @@ class ClayHandler(http.server.SimpleHTTPRequestHandler):
         content = clay_html.read_bytes()
         self.send_response(200)
         self.send_header("Content-Type", "text/html; charset=utf-8")
+        self._send_csp_headers()
         self.send_header("Content-Length", str(len(content)))
         self.end_headers()
         self.wfile.write(content)
@@ -2778,6 +2847,73 @@ class ClayHandler(http.server.SimpleHTTPRequestHandler):
                 self._send_json({"error": str(e)}, 500)
             return
         self.send_error(404)
+
+    def _send_csp_headers(self):
+        """Add Content-Security-Policy to HTML responses."""
+        self.send_header(
+            "Content-Security-Policy",
+            "default-src 'self'; "
+            "script-src 'self' 'unsafe-inline' cdn.jsdelivr.net analytics.umami.is; "
+            "style-src 'self' 'unsafe-inline' fonts.googleapis.com api.fontshare.com; "
+            "font-src 'self' fonts.gstatic.com api.fontshare.com; "
+            "frame-src 'self' tally.so; "
+            "connect-src 'self' localhost:11434 localhost:3000; "
+            "img-src 'self' data:;"
+        )
+
+    def _handle_activate_pro(self):
+        try:
+            body = json.loads(self._read_body())
+            key = str(body.get("license_key", "")).strip()[:100]
+            if not key:
+                self._send_json({"success": False, "error": "No license key provided"}); return
+            # Validate via Lemon Squeezy
+            api_key = os.environ.get("LEMON_SQUEEZY_API_KEY", "")
+            store_id = os.environ.get("LEMON_SQUEEZY_STORE_ID", "openclay")
+            if api_key:
+                try:
+                    import urllib.request as ur
+                    req = ur.Request(
+                        "https://api.lemonsqueezy.com/v1/licenses/validate",
+                        data=json.dumps({"license_key": key, "instance_name": store_id}).encode(),
+                        headers={"Content-Type": "application/json", "Accept": "application/json",
+                                 "Authorization": f"Bearer {api_key}"},
+                    )
+                    resp = json.loads(ur.urlopen(req, timeout=10).read())
+                    if not resp.get("activated") and not resp.get("valid"):
+                        self._send_json({"success": False, "error": "Invalid license key"}); return
+                    email = resp.get("meta", {}).get("customer_email", "")
+                except Exception as e:
+                    # If validation fails (network, etc.) in dev mode, allow key starting with "dev-"
+                    if not key.startswith("dev-"):
+                        self._send_json({"success": False, "error": f"Validation error: {e}"}); return
+                    email = "dev@openclay.local"
+            else:
+                # No API key configured — allow dev keys for local dev
+                if not key.startswith("dev-"):
+                    self._send_json({"success": False, "error": "LEMON_SQUEEZY_API_KEY not configured"}); return
+                email = "dev@openclay.local"
+            # Save license
+            global PRO_ACTIVE
+            _OPENCLAY_DIR.mkdir(exist_ok=True)
+            _LICENSE_FILE.write_text(json.dumps({
+                "pro": True, "key": key,
+                "activated_at": datetime.now().isoformat(),
+                "email": email
+            }, indent=2), "utf-8")
+            PRO_ACTIVE = True
+            self._send_json({"success": True, "email": email})
+        except Exception as e:
+            self._send_json({"success": False, "error": str(e)})
+
+    def _handle_pro_status(self):
+        try:
+            data = {}
+            if _LICENSE_FILE.exists():
+                data = json.loads(_LICENSE_FILE.read_text("utf-8"))
+            self._send_json({"pro": PRO_ACTIVE, "email": data.get("email",""), "activated_at": data.get("activated_at","")})
+        except Exception:
+            self._send_json({"pro": False})
 
     def do_OPTIONS(self):
         self.send_response(200)

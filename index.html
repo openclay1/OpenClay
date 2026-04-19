@@ -494,7 +494,7 @@
   </style>
 </head>
 <body>
-  <div id="title"><h1>OpenClay</h1><p>COANA LABS &middot; LOCAL &middot; PRIVADO &middot; TUYO</p></div>
+  <div id="title"><h1>OpenClay <span id="pro-badge" style="display:none;font-family:'Satoshi',sans-serif;font-style:normal;font-size:0.55rem;font-weight:700;background:rgba(1,105,111,0.15);color:#01696f;border:1px solid rgba(1,105,111,0.3);border-radius:9999px;padding:2px 7px;vertical-align:middle;letter-spacing:0.05em;">PRO</span></h1><p>COANA LABS &middot; LOCAL &middot; PRIVADO &middot; TUYO</p></div>
   <div id="last-query"></div>
   <button id="demo-mode-btn" onclick="toggleDemoMode()" title="Demo Mode — smooth animations for screen recording">&#127916; Demo</button>
   <div id="rec-indicator"><span class="rec-dot"></span>REC</div>
@@ -558,6 +558,7 @@
         <button class="settings-tab" onclick="switchTab('models')" data-i18n="tabs.models">Modelos</button>
         <button class="settings-tab" onclick="switchTab('voice')" data-i18n="tabs.voice">Voz</button>
         <button class="settings-tab" onclick="switchTab('orchestrate')">&#9889; Orquesta</button>
+        <button class="settings-tab" onclick="switchTab('pro')">&#128273; Pro</button>
       </div>
       <!-- Agents -->
       <div id="tab-agents" class="tab-content active">
@@ -677,6 +678,28 @@
           <button onclick="saveVoicePreference()" class="settings-action primary" style="flex:1;" data-i18n="save">Guardar</button>
         </div>
         <div style="margin-top:12px;font-size:0.68rem;color:var(--faint);" id="tts-engine-label"></div>
+      </div>
+      <!-- Pro activation -->
+      <div id="tab-pro" class="tab-content">
+        <div id="pro-status-banner" style="display:none;padding:12px;background:rgba(1,105,111,0.12);border:1px solid rgba(1,105,111,0.3);border-radius:var(--radius-lg);margin-bottom:14px;">
+          <div style="font-size:0.85rem;font-weight:600;color:#01696f;">&#10003; OpenClay Pro</div>
+          <div id="pro-email" style="font-size:0.7rem;color:var(--muted);margin-top:2px;"></div>
+        </div>
+        <div id="pro-activation-form">
+          <h3 data-i18n="activatePro">Activar Pro</h3>
+          <p style="font-size:0.75rem;color:var(--muted);margin-bottom:10px;">Enter your license key from Lemon Squeezy / Gumroad.</p>
+          <input type="text" id="pro-key-input" placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+            style="width:100%;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius-md);padding:8px 10px;font-family:inherit;font-size:0.78rem;color:var(--text);outline:none;margin-bottom:8px;">
+          <button onclick="activatePro()" class="settings-action primary" style="width:100%;">&#128273; Activate</button>
+          <div id="pro-activate-msg" style="font-size:0.72rem;margin-top:8px;"></div>
+        </div>
+        <div style="margin-top:16px;padding-top:16px;border-top:1px solid var(--divider);">
+          <p style="font-size:0.72rem;color:var(--faint);">Don't have a license?</p>
+          <a href="https://coanalabs.gumroad.com/l/openclay-pro" target="_blank"
+            style="display:block;margin-top:6px;text-align:center;padding:8px;background:var(--accent-soft);border:1px solid var(--primary);border-radius:var(--radius-full);color:var(--primary);font-size:0.75rem;font-weight:600;text-decoration:none;">
+            Get OpenClay Pro &mdash; $12/mo &rarr;
+          </a>
+        </div>
       </div>
       <!-- Orchestrate tab -->
       <div id="tab-orchestrate" class="tab-content">
@@ -1095,6 +1118,7 @@
       if (name === 'memory') loadMemories();
       if (name === 'orchestrate') loadOrchestration();
       if (name === 'history') renderHistory();
+      if (name === 'pro') checkProStatus();
     }
 
     // ═══ Model recommendations ═══
@@ -1648,6 +1672,49 @@
       rec.classList.toggle('visible', demoMode);
       showBadge('demo', demoMode ? '&#127916; Demo Mode ON' : 'Demo Mode OFF', false);
       setTimeout(() => removeBadge('demo'), 2000);
+    }
+
+    // ═══ Pro License ═══
+    window.CLAY_PRO = false;
+
+    async function checkProStatus() {
+      try {
+        const r = await fetch('/api/pro-status');
+        const d = await r.json();
+        window.CLAY_PRO = d.pro === true;
+        const badge = document.getElementById('pro-badge');
+        const banner = document.getElementById('pro-status-banner');
+        const form = document.getElementById('pro-activation-form');
+        if (window.CLAY_PRO) {
+          if (badge) badge.style.display = 'inline-flex';
+          if (banner) { banner.style.display = 'block'; }
+          if (form) form.style.display = 'none';
+          const emailEl = document.getElementById('pro-email');
+          if (emailEl && d.email) emailEl.textContent = d.email;
+        } else {
+          if (badge) badge.style.display = 'none';
+        }
+      } catch(e) {}
+    }
+
+    async function activatePro() {
+      const key = (document.getElementById('pro-key-input').value || '').trim();
+      const msg = document.getElementById('pro-activate-msg');
+      if (!key) { msg.textContent = '\u26A0 Enter a license key'; msg.style.color = 'var(--primary)'; return; }
+      msg.textContent = 'Validating\u2026'; msg.style.color = 'var(--muted)';
+      try {
+        const r = await fetch('/api/activate-pro', {
+          method: 'POST', headers: {'Content-Type':'application/json'},
+          body: JSON.stringify({license_key: key})
+        });
+        const d = await r.json();
+        if (d.success) {
+          msg.textContent = '\u2705 Pro activated \u2014 welcome.'; msg.style.color = '#01696f';
+          await checkProStatus();
+        } else {
+          msg.textContent = '\u2717 ' + (d.error || 'Invalid key'); msg.style.color = '#c0392b';
+        }
+      } catch(e) { msg.textContent = '\u2717 Error: ' + e.message; msg.style.color = '#c0392b'; }
     }
 
     let _lastActiveTaskId = null;
@@ -2364,6 +2431,7 @@
     })();
 
     updateStatus(); setInterval(updateStatus,15000);
+    checkProStatus();
     checkHardwareBanner();
     setTimeout(checkContinueBanner, 2000);
 

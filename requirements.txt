@@ -19,4 +19,4 @@ PyMuPDF==1.23.26
 # Leer archivos Excel
 openpyxl==3.1.2
 # Memoria persistente local (usa Ollama, sin nube)
-mem0ai>=0.1.0
+mem0ai>=0.1.50

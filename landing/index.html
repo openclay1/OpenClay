@@ -496,6 +496,11 @@
       *, *::before, *::after { animation: none !important; transition: none !important; }
     }
   </style>
+  <!-- Umami analytics — privacy-first, self-hosted -->
+  <script async defer
+    src="https://analytics.umami.is/script.js"
+    data-website-id="YOUR_UMAMI_ID">
+  </script>
 </head>
 <body>
 
@@ -530,7 +535,7 @@
         Pharmaceutical-grade precision meets full personal sovereignty.
       </p>
       <div class="hero-ctas">
-        <a href="https://github.com/coanalabs/openclay" class="btn-primary">Download free</a>
+        <a href="https://github.com/coanalabs/openclay" class="btn-primary" data-umami-event="download_free">Download free</a>
         <a href="#how" class="btn-secondary">How it works</a>
       </div>
       <div class="hero-badges">
@@ -742,7 +747,7 @@
             <li><span class="li-check">&#10003;</span> Multilingual (ES/EN)</li>
             <li><span class="li-check">&#10003;</span> Folder watchers</li>
           </ul>
-          <a href="https://github.com/coanalabs/openclay" class="pricing-btn free-btn">Download free</a>
+          <a href="https://github.com/coanalabs/openclay" class="pricing-btn free-btn" data-umami-event="download_free">Download free</a>
         </div>
         <!-- Pro -->
         <div class="pricing-card pro">
@@ -759,7 +764,7 @@
             <li><span class="li-check">&#10003;</span> Export full memory history</li>
             <li><span class="li-check">&#10003;</span> Lifetime updates</li>
           </ul>
-          <a href="https://coanalabs.gumroad.com/l/openclay-pro" target="_blank" class="pricing-btn pro-btn">Get Pro — $49</a>
+          <a href="https://coanalabs.gumroad.com/l/openclay-pro" target="_blank" class="pricing-btn pro-btn" data-umami-event="cta_pro_click">Get Pro — $49</a>
         </div>
       </div>
     </div>
@@ -774,7 +779,7 @@
       <p class="section-sub" style="margin:0 auto 32px;">
         Get notified when new features ship — including Clay Code Pro, mobile agent, and the Meshtastic mesh network.
       </p>
-      <form class="waitlist-form" onsubmit="handleWaitlist(event)">
+      <form class="waitlist-form" onsubmit="handleWaitlist(event)" data-umami-event="waitlist_submit">
         <input type="email" class="waitlist-input" placeholder="your@email.com" required id="waitlist-email">
         <button type="submit" class="waitlist-btn">Join waitlist</button>
       </form>
@@ -796,8 +801,8 @@
 
   <!-- Mobile sticky bar -->
   <div class="mobile-sticky">
-    <a href="https://github.com/coanalabs/openclay" class="btn-secondary">Download free</a>
-    <a href="https://coanalabs.gumroad.com/l/openclay-pro" class="btn-primary">Get Pro</a>
+    <a href="https://github.com/coanalabs/openclay" class="btn-secondary" data-umami-event="download_free">Download free</a>
+    <a href="https://coanalabs.gumroad.com/l/openclay-pro" class="btn-primary" data-umami-event="cta_pro_click">Get Pro</a>
   </div>
 
   <script>
