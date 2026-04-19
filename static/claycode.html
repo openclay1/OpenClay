@@ -642,6 +642,8 @@ function loadHistory() {
   const msgs = document.getElementById('chat-messages');
   let stored = [];
   try { stored = JSON.parse(localStorage.getItem(HISTORY_KEY) || '[]'); } catch(e) {}
+  // Only show messages from Clay Code (source tag), never blob messages
+  stored = stored.filter(m => !m.source || m.source === 'claycode');
   if (stored.length === 0) {
     // Fresh session — show ready message, don't persist it
     const el = document.createElement('div');
@@ -657,7 +659,7 @@ function loadHistory() {
 function _saveToHistory(role, content) {
   let stored = [];
   try { stored = JSON.parse(localStorage.getItem(HISTORY_KEY) || '[]'); } catch(e) {}
-  stored.push({role, content, timestamp: new Date().toISOString()});
+  stored.push({role, content, timestamp: new Date().toISOString(), source: 'claycode'});
   if (stored.length > HISTORY_MAX) stored = stored.slice(stored.length - HISTORY_MAX);
   try { localStorage.setItem(HISTORY_KEY, JSON.stringify(stored)); } catch(e) {}
 }
@@ -691,27 +693,54 @@ function renderHistorySidebar() {
   const list = document.getElementById('history-list');
   let stored = [];
   try { stored = JSON.parse(localStorage.getItem(HISTORY_KEY) || '[]'); } catch(e) {}
+  // Only Clay Code messages
+  stored = stored.filter(m => !m.source || m.source === 'claycode');
   if (!stored.length) {
     list.innerHTML = '<div style="padding:14px;font-size:0.72rem;color:var(--muted)">No history yet.</div>';
     return;
   }
-  // Show last 20, newest first
-  const items = stored.slice(-20).reverse();
+  // Build paired exchanges (user + following assistant reply)
+  const pairs = [];
+  for (let i = 0; i < stored.length; i++) {
+    if (stored[i].role !== 'user') continue;
+    const reply = stored[i+1] && stored[i+1].role === 'assistant' ? stored[i+1] : null;
+    pairs.push({user: stored[i], assistant: reply});
+  }
+  const recent = pairs.slice(-20).reverse();
   list.innerHTML = '';
-  for (const m of items) {
+  for (const p of recent) {
     const el = document.createElement('div');
     el.className = 'hist-item';
-    const ts = m.timestamp ? new Date(m.timestamp).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}) : '';
-    el.innerHTML = `<div class="hist-role">${m.role === 'user' ? 'you' : 'clay coder'} ${ts}</div><div class="hist-text">${escHtml(m.content)}</div>`;
-    if (m.role === 'user') {
-      el.onclick = () => {
-        document.getElementById('chat-input').value = m.content;
-        document.getElementById('chat-input').focus();
-        toggleHistorySidebar();
-      };
-    }
+    const ts = p.user.timestamp ? new Date(p.user.timestamp).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}) : '';
+    const preview = p.user.content.slice(0, 80) + (p.user.content.length > 80 ? '…' : '');
+    el.innerHTML = `<div class="hist-role">you ${ts}</div><div class="hist-text">${escHtml(preview)}</div>`;
+    el.onclick = () => restoreExchangeCC(p.user.content, p.assistant ? p.assistant.content : '');
     list.appendChild(el);
   }
+}
+
+function restoreExchangeCC(userText, assistantText) {
+  toggleHistorySidebar();
+  const msgs = document.getElementById('chat-messages');
+  // Render user msg as dimmed context
+  const uEl = document.createElement('div');
+  uEl.className = 'msg user';
+  uEl.style.opacity = '0.55';
+  uEl.innerHTML = '<div class="role">you (history)</div><div class="bubble">' + escHtml(userText) + '</div>';
+  msgs.appendChild(uEl);
+  // Render assistant reply if present
+  if (assistantText) {
+    const aEl = document.createElement('div');
+    aEl.className = 'msg assistant';
+    aEl.style.opacity = '0.55';
+    aEl.innerHTML = '<div class="role">clay coder (history)</div><div class="bubble">' + escHtml(assistantText.slice(0, 400)) + (assistantText.length > 400 ? '…' : '') + '</div>';
+    msgs.appendChild(aEl);
+  }
+  msgs.scrollTop = msgs.scrollHeight;
+  const inp = document.getElementById('chat-input');
+  inp.placeholder = 'Continue this conversation…';
+  inp.focus();
+  setTimeout(() => { inp.placeholder = 'Ask Clay Coder…'; }, 8000);
 }
 
 // ── Thinking bubble ───────────────────────────────────
@@ -978,8 +1007,9 @@ async function sendMessage() {
   let streamEl = null;
 
   try {
-    console.log('[Clay Coder] POST /api/ask', {prompt: prompt.slice(0, 120)});
-    const res = await fetch('/api/ask', {
+    const CHAT_URL = '/api/ask';
+    console.log('[Clay Coder] POST', CHAT_URL, {prompt: prompt.slice(0, 120)});
+    const res = await fetch(CHAT_URL, {
       method: 'POST',
       headers: {'Content-Type': 'application/json'},
       body: JSON.stringify({prompt})

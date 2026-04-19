@@ -15,6 +15,34 @@ PREFERRED_MODELS = ["qwen2.5:3b-instruct-q4_K_M", "qwen2.5:3b", "llama3.2:3b",
                      "phi3:mini", "gemma4:latest"]
 # Ranked model preference for health checks (shorter names, prefix-matched)
 MODEL_RANK_HEALTH = ["qwen2.5:3b", "gemma3:4b", "llama3.2:3b"]
+
+# ── Safe model registry for auto-discovery ───────────────────────
+SAFE_MODELS = [
+    "qwen2.5-coder:7b",
+    "qwen2.5-coder:14b",
+    "devstral:latest",
+    "gemma3:12b",
+    "llama3.1:8b",
+]
+# Approximate RAM requirements in GB (for fit check: available_ram * 0.6 > requirement)
+MODEL_RAM_REQUIREMENTS = {
+    "qwen2.5-coder:7b":  6.0,
+    "qwen2.5-coder:14b": 12.0,
+    "devstral:latest":   14.0,
+    "gemma3:12b":        10.0,
+    "llama3.1:8b":       7.0,
+}
+# Quality ranking — higher = better (for _get_best_model)
+MODEL_QUALITY_RANK = {
+    "devstral":          10,
+    "qwen2.5-coder:14b":  9,
+    "gemma3:12b":         8,
+    "qwen2.5-coder:7b":   7,
+    "llama3.1:8b":        6,
+    "qwen2.5:3b":         3,
+    "llama3.2:3b":        2,
+    "phi3":               1,
+}
 BASE_DIR = Path(__file__).parent
 WIKI_DIR = BASE_DIR / "wiki"
 MEMORY_DIR = BASE_DIR / "memory"
@@ -110,6 +138,9 @@ def _detect_hardware():
         profile["estimated_response_time"] = "3–8 seconds"
     else:
         profile["estimated_response_time"] = "20–40 seconds"
+    # Check for Kokoro TTS
+    kokoro_path = BASE_DIR / "models" / "kokoro-82m"
+    profile["tts_engine"] = "kokoro" if kokoro_path.exists() else "browser"
     # Write to disk
     try:
         HARDWARE_PROFILE_FILE.write_text(json.dumps(profile, indent=2), "utf-8")
@@ -193,6 +224,57 @@ def _detect_model():
         if available: _model = available[0]; return _model
     except Exception: pass
     _model = PREFERRED_MODELS[0]; return _model
+
+def _get_available_models():
+    """Return list of installed model names from Ollama."""
+    try:
+        resp = urllib.request.urlopen(f"{OLLAMA_URL}/api/tags", timeout=5)
+        return [m["name"] for m in json.loads(resp.read()).get("models", [])]
+    except Exception:
+        return []
+
+def _get_best_model(available=None):
+    """Return the highest-ranked installed model. Used for all agents."""
+    if available is None:
+        available = _get_available_models()
+    best_name, best_score = None, -1
+    for m in available:
+        m_lower = m.lower()
+        for key, score in MODEL_QUALITY_RANK.items():
+            if m_lower.startswith(key.split(":")[0]):
+                if score > best_score:
+                    best_score = score
+                    best_name = m
+                break
+    return best_name or (_model or PREFERRED_MODELS[0])
+
+def _check_for_better_models():
+    """Log recommendations for better models that fit in available RAM."""
+    try:
+        hp = json.loads(HARDWARE_PROFILE_FILE.read_text("utf-8")) if HARDWARE_PROFILE_FILE.exists() else {}
+        available_ram = hp.get("ram_gb", 0)
+        installed = set(_get_available_models())
+        installed_names = {m.split(":")[0].lower() for m in installed}
+        recommendations = []
+        for model in SAFE_MODELS:
+            base = model.split(":")[0].lower()
+            if base in installed_names:
+                continue  # already installed
+            req = MODEL_RAM_REQUIREMENTS.get(model, 8.0)
+            if available_ram * 0.6 > req:
+                msg = f"  [models] A better model is available: {model}. Run: ollama pull {model}"
+                print(msg)
+                recommendations.append({
+                    "name": model,
+                    "ram_required_gb": req,
+                    "why": f"Higher quality responses; fits in your {available_ram}GB RAM",
+                    "installed": False,
+                })
+        # Store recommendations in hardware profile for API access
+        hp["model_recommendations"] = recommendations
+        HARDWARE_PROFILE_FILE.write_text(json.dumps(hp, indent=2), "utf-8")
+    except Exception as e:
+        print(f"  [models] recommendation check failed: {e}")
 
 def _model_health_check():
     """Silently refresh active model selection. Never pulls models."""
@@ -1808,7 +1890,13 @@ class ClayHandler(http.server.SimpleHTTPRequestHandler):
             # Projects
             "/api/projects/save": self._handle_project_save,
             "/api/projects/list": self._handle_project_list,
+            # Models
+            "/api/models/install": self._handle_model_install,
         }
+        # Dynamic POST routes (path contains variable segments)
+        if re.match(r"^/api/projects/[^/]+/rename$", self.path):
+            self._handle_project_rename()
+            return
         handler = routes.get(self.path)
         if handler: handler()
         else: self.send_error(404)
@@ -1848,6 +1936,14 @@ class ClayHandler(http.server.SimpleHTTPRequestHandler):
                 self._send_json(hp)
             except Exception:
                 self._send_json({})
+            return
+        # TTS: GET /api/tts?text=...&voice=...
+        if self.path.startswith("/api/tts"):
+            self._handle_tts_get()
+            return
+        # Model recommendations
+        if self.path == "/api/models/recommendations":
+            self._handle_model_recommendations()
             return
         # Clay Code Pro routes
         if self.path == "/claycode":
@@ -1919,7 +2015,9 @@ class ClayHandler(http.server.SimpleHTTPRequestHandler):
         if loaded_document:
             full_prompt = f"[Document: {loaded_filename}]\n\n{loaded_document[:6000]}\n\n---\nUser: {prompt}"
 
-        model = _current_agent.get("model", _detect_model()) if _current_agent else _detect_model()
+        # Always route to the best available model; agent config can override
+        _best = _get_best_model()
+        model = _current_agent.get("model", _best) if _current_agent else _best
         # Clay Coder: shorter completions cut response time ~50% on CPU
         is_coder = _current_agent and _current_agent.get("name") == "Clay Coder"
         num_predict = 256 if is_coder else 512
@@ -2422,6 +2520,7 @@ class ClayHandler(http.server.SimpleHTTPRequestHandler):
                     "created_at": p.get("created_at", ""),
                     "updated_at": p.get("updated_at", ""),
                     "agent": p.get("agent", ""),
+                    "agent_name": p.get("agent_name") or p.get("agent", ""),
                     "agent_color": p.get("agent_color", "#e06438"),
                     "message_count": p.get("message_count", 0),
                     "source": p.get("source", "blob"),
@@ -2430,17 +2529,132 @@ class ClayHandler(http.server.SimpleHTTPRequestHandler):
                 pass
         self._send_json({"projects": projects})
 
+    def _handle_project_rename(self):
+        try:
+            # Extract project id from path: /api/projects/:id/rename
+            parts = self.path.strip("/").split("/")
+            # parts: ['api', 'projects', ':id', 'rename']
+            proj_id = parts[2] if len(parts) >= 4 else ""
+            body = json.loads(self._read_body())
+            new_name = body.get("name", "").strip()
+            if not proj_id or not new_name:
+                self._send_json({"error": "missing id or name"}, 400)
+                return
+            pf = PROJECTS_DIR / f"{proj_id}.json"
+            if not pf.exists():
+                self._send_json({"error": "not found"}, 404)
+                return
+            p = json.loads(pf.read_text("utf-8"))
+            p["name"] = new_name
+            p["updated_at"] = __import__("datetime").datetime.utcnow().isoformat()
+            pf.write_text(json.dumps(p, ensure_ascii=False, indent=2), "utf-8")
+            self._send_json({"ok": True, "name": new_name})
+        except Exception as e:
+            self._send_json({"error": str(e)}, 500)
+
     def _handle_pro_waitlist(self):
-        body = json.loads(self._read_body())
-        email = body.get("email", "")
-        from pro.license import add_to_waitlist
-        ok = add_to_waitlist(email)
-        self._send_json({"ok": ok})
+        try:
+            body = json.loads(self._read_body())
+            email = body.get("email", "")
+            from pro.license import add_to_waitlist
+            ok = add_to_waitlist(email)
+            self._send_json({"ok": ok})
+        except Exception:
+            self._send_json({"ok": False})
+
+    # ── TTS: GET /api/tts?text=...&voice=... ─────────────────────
+    def _handle_tts_get(self):
+        try:
+            from urllib.parse import urlparse, parse_qs, unquote_plus
+            parsed = urlparse(self.path)
+            params = parse_qs(parsed.query)
+            text = unquote_plus(params.get("text", [""])[0])[:500]
+            if not text:
+                self._send_json({"fallback": True, "reason": "no text"})
+                return
+            # Check if Kokoro is available
+            kokoro_path = BASE_DIR / "models" / "kokoro-82m"
+            if not kokoro_path.exists():
+                self._send_json({"fallback": True, "reason": "kokoro not installed"})
+                return
+            # Kokoro TTS — generate WAV and return as base64
+            try:
+                import base64, tempfile, wave
+                # Placeholder: actual Kokoro integration would call the model here
+                # For now, signal fallback so browser TTS is used
+                self._send_json({"fallback": True, "reason": "kokoro integration pending"})
+            except Exception as e:
+                self._send_json({"fallback": True, "reason": str(e)})
+        except Exception as e:
+            self._send_json({"fallback": True, "reason": str(e)})
+
+    # ── Model recommendations ─────────────────────────────────────
+    def _handle_model_recommendations(self):
+        try:
+            hp = json.loads(HARDWARE_PROFILE_FILE.read_text("utf-8")) if HARDWARE_PROFILE_FILE.exists() else {}
+            recs = hp.get("model_recommendations", [])
+            installed = _get_available_models()
+            best = _get_best_model(installed)
+            self._send_json({
+                "recommendations": recs,
+                "installed": installed,
+                "best_model": best,
+            })
+        except Exception as e:
+            self._send_json({"recommendations": [], "error": str(e)})
+
+    # ── Model install (streams progress) ─────────────────────────
+    def _handle_model_install(self):
+        try:
+            body = json.loads(self._read_body())
+            model_name = body.get("model", "").strip()
+            # Validate against safe list
+            if not any(model_name.startswith(sm.split(":")[0]) for sm in SAFE_MODELS):
+                self._send_json({"ok": False, "error": "Model not in safe list"}, 400)
+                return
+            self.send_response(200)
+            self.send_header("Content-Type", "application/x-ndjson")
+            self.send_header("Cache-Control", "no-cache")
+            self.send_header("Access-Control-Allow-Origin", "*")
+            self.end_headers()
+            # Stream ollama pull progress
+            proc = subprocess.Popen(
+                ["ollama", "pull", model_name],
+                stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True
+            )
+            for line in proc.stdout:
+                chunk = json.dumps({"progress": line.strip()}) + "\n"
+                try:
+                    self.wfile.write(chunk.encode()); self.wfile.flush()
+                except Exception:
+                    break
+            proc.wait()
+            ok = proc.returncode == 0
+            self.wfile.write(json.dumps({"done": True, "ok": ok, "model": model_name}).encode() + b"\n")
+            self.wfile.flush()
+        except Exception as e:
+            self._send_json({"ok": False, "error": str(e)})
+
+    def do_DELETE(self):
+        """Handle DELETE /api/projects/:id"""
+        if self.path.startswith("/api/projects/") and len(self.path) > len("/api/projects/"):
+            try:
+                proj_id = self.path.split("/api/projects/")[1].strip("/")
+                pf = PROJECTS_DIR / f"{proj_id}.json"
+                if pf.exists():
+                    pf.unlink()
+                    self._send_json({"ok": True})
+                else:
+                    self._send_json({"error": "not found"}, 404)
+            except Exception as e:
+                self._send_json({"error": str(e)}, 500)
+            return
+        self.send_error(404)
 
     def do_OPTIONS(self):
         self.send_response(200)
         self.send_header("Access-Control-Allow-Origin", "*")
-        self.send_header("Access-Control-Allow-Methods", "POST, GET, OPTIONS")
+        self.send_header("Access-Control-Allow-Methods", "POST, GET, DELETE, OPTIONS")
         self.send_header("Access-Control-Allow-Headers", "Content-Type")
         self.end_headers()
 
@@ -2510,6 +2724,9 @@ def main():
     # Hardware profile
     hw = _detect_hardware()
     print(f"  Hardware: {hw.get('cpu_cores','?')} cores · {hw.get('ram_gb','?')} GB RAM · GPU: {hw.get('gpu','none')}")
+    print(f"  TTS engine: {hw.get('tts_engine','browser')}")
+    # Check for better models (logs recommendations, no auto-install)
+    _check_for_better_models()
     # Auto-create pro/license.key so Clay Code always works locally
     _pro_dir = BASE_DIR / "pro"
     _license_key = _pro_dir / "license.key"

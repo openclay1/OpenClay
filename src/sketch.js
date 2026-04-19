@@ -193,11 +193,15 @@ function setRecordingState(recording) {
 
 async function askOllama(prompt) {
   const demoThinkStart = Date.now();
+  // Expose abort controller so toggleMute() can cancel streaming
+  const _ctrl = new AbortController();
+  window._streamAbortController = _ctrl;
   try {
     const resp = await fetch("/api/ask", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ prompt }),
+      signal: _ctrl.signal,
     });
     if (!resp.ok) throw new Error("Server error: " + resp.status);
 
@@ -254,8 +258,15 @@ async function askOllama(prompt) {
     if (typeof addToHistory === 'function') addToHistory('assistant', fullText);
     if (typeof speakText === 'function') speakText(fullText);
   } catch (err) {
+    if (err && err.name === 'AbortError') {
+      // User cancelled — stay quiet, just return to idle
+      if (state === 'thinking') state = 'idle';
+      return;
+    }
     responseText = "No pude conectar con el modelo local.\nVerifica que Ollama este corriendo.";
     state = "speaking";
+  } finally {
+    if (window._streamAbortController === _ctrl) window._streamAbortController = null;
   }
 }
 

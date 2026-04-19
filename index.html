@@ -391,6 +391,97 @@
       font-family: inherit; transition: all var(--transition); }
     #continue-banner .cb-btns button.primary { background: var(--agent-color); border-color: var(--agent-color); color: #fff; }
     #continue-banner .cb-btns button:hover:not(.primary) { border-color: var(--agent-color); color: var(--agent-color); }
+
+    /* ═══ Projects Sidebar (Perplexity-style) ═══ */
+    #proj-sidebar {
+      position: fixed; top: 0; left: 0; bottom: 0; width: 220px; z-index: 25;
+      background: var(--surface); border-right: 1px solid var(--border);
+      display: flex; flex-direction: column;
+      transform: translateX(-220px);
+      transition: transform 250ms cubic-bezier(0.16,1,0.3,1); overflow: hidden;
+    }
+    #proj-sidebar.open { transform: translateX(0); }
+    #proj-sidebar-toggle {
+      position: fixed; left: 0; top: 50%; transform: translateY(-50%);
+      z-index: 26; width: 18px; height: 40px;
+      background: var(--surface); border: 1px solid var(--border); border-left: none;
+      border-radius: 0 var(--radius-md) var(--radius-md) 0;
+      cursor: pointer; display: flex; align-items: center; justify-content: center;
+      font-size: 0.65rem; color: var(--muted);
+      transition: left 250ms cubic-bezier(0.16,1,0.3,1), background var(--transition), color var(--transition);
+    }
+    #proj-sidebar.open ~ #proj-sidebar-toggle { left: 220px; }
+    #proj-sidebar-toggle:hover { background: var(--accent-soft); color: var(--primary); }
+    #proj-sidebar-header { padding: 16px 12px 10px; border-bottom: 1px solid var(--divider); flex-shrink: 0; }
+    #proj-sidebar-title {
+      font-family: 'Instrument Serif',Georgia,serif; font-style: italic;
+      font-size: 0.9rem; color: var(--agent-color); margin-bottom: 8px;
+    }
+    #proj-sidebar-new {
+      width: 100%; padding: 7px 10px;
+      background: var(--accent-soft); border: 1px solid var(--primary);
+      border-radius: var(--radius-full); color: var(--primary);
+      font-size: 0.72rem; font-weight: 600; font-family: inherit;
+      cursor: pointer; text-align: center; transition: all var(--transition);
+    }
+    #proj-sidebar-new:hover { background: var(--primary); color: #fff; }
+    #proj-sidebar-list { flex: 1; overflow-y: auto; padding: 4px 0; }
+    #proj-sidebar-list::-webkit-scrollbar { width: 3px; }
+    #proj-sidebar-list::-webkit-scrollbar-track { background: transparent; }
+    #proj-sidebar-list::-webkit-scrollbar-thumb { background: #2d2920; border-radius: 2px; }
+    .psb-group-label {
+      font-size: 0.58rem; font-weight: 600; text-transform: uppercase;
+      letter-spacing: 0.07em; color: var(--faint);
+      padding: 10px 12px 3px; pointer-events: none; user-select: none;
+    }
+    .psb-item {
+      position: relative; padding: 7px 12px; cursor: pointer;
+      transition: background var(--transition);
+    }
+    .psb-item:hover { background: var(--surface-2); }
+    .psb-item.active { background: var(--primary-highlight); }
+    .psb-name {
+      font-size: 0.75rem; color: var(--text); white-space: nowrap;
+      overflow: hidden; text-overflow: ellipsis; display: block; line-height: 1.3;
+      transition: color var(--transition);
+    }
+    .psb-item:hover .psb-name { color: var(--primary); }
+    .psb-meta { font-size: 0.6rem; color: var(--faint); margin-top: 2px;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .psb-actions {
+      position: absolute; right: 6px; top: 50%; transform: translateY(-50%);
+      display: none; gap: 1px; align-items: center;
+      background: var(--surface-2); border-radius: var(--radius-sm); padding: 1px;
+    }
+    .psb-item:hover .psb-actions { display: flex; }
+    .psb-act-btn {
+      background: none; border: none; cursor: pointer;
+      font-size: 0.72rem; padding: 2px 4px; color: var(--muted);
+      border-radius: var(--radius-sm); transition: all var(--transition); line-height: 1;
+    }
+    .psb-act-btn:hover { background: var(--accent-soft); color: var(--primary); }
+    .psb-act-btn.del:hover { color: #c0392b; }
+    .psb-rename-input {
+      width: 100%; background: var(--bg); border: 1px solid var(--primary);
+      border-radius: var(--radius-sm); padding: 3px 6px; margin-top: 2px;
+      font-size: 0.75rem; font-family: inherit; color: var(--text); outline: none;
+    }
+    @media (max-width: 768px) {
+      #proj-sidebar {
+        top: auto; left: 0; right: 0; bottom: -65vh;
+        width: 100%; height: 65vh; transform: none;
+        border-right: none; border-top: 1px solid var(--border);
+        border-radius: 1.25rem 1.25rem 0 0;
+        transition: bottom 250ms cubic-bezier(0.16,1,0.3,1);
+      }
+      #proj-sidebar.open { bottom: 0; transform: none; }
+      #proj-sidebar-toggle {
+        left: 16px !important; top: auto; bottom: 95px; transform: none;
+        width: auto; height: auto; border-radius: var(--radius-full);
+        padding: 5px 12px; border: 1px solid var(--border);
+        font-size: 0.68rem; border-left: 1px solid var(--border);
+      }
+    }
   </style>
 </head>
 <body>
@@ -407,7 +498,17 @@
     <div class="hw-msg" id="hw-banner-msg"></div>
     <button onclick="dismissHwBanner()" title="Dismiss">&times;</button>
   </div>
-  <!-- Projects panel -->
+  <!-- Projects Sidebar (Perplexity-style) -->
+  <div id="proj-sidebar">
+    <div id="proj-sidebar-header">
+      <div id="proj-sidebar-title">OpenClay</div>
+      <button id="proj-sidebar-new" id="sidebar-new-conv" onclick="newConversation()" data-i18n="newConversation">＋ Nueva conversación</button>
+    </div>
+    <div id="proj-sidebar-list"><div class="psb-group-label" style="padding-top:16px;">Cargando…</div></div>
+  </div>
+  <button id="proj-sidebar-toggle" onclick="toggleProjSidebar()" title="Toggle sidebar">›</button>
+
+  <!-- Projects panel (legacy floating panel, kept for toolbar button) -->
   <div id="projects-overlay" onclick="toggleProjects()"></div>
   <div id="projects-panel">
     <div id="projects-panel-header">
@@ -434,81 +535,83 @@
     <div class="settings-inner">
       <h2>OpenClay</h2>
       <div class="settings-tabs">
-        <button class="settings-tab active" onclick="switchTab('agents')">Agentes</button>
-        <button class="settings-tab" onclick="switchTab('sources')">Fuentes</button>
-        <button class="settings-tab" onclick="switchTab('memory')">Memoria</button>
-        <button class="settings-tab" onclick="switchTab('history')">Historial</button>
-        <button class="settings-tab" onclick="switchTab('logs')">Registros</button>
-        <button class="settings-tab" onclick="switchTab('exec')">Sandbox</button>
-        <button class="settings-tab" onclick="switchTab('mesh')">Red</button>
-        <button class="settings-tab" onclick="switchTab('tasks')">Tareas</button>
+        <button class="settings-tab active" onclick="switchTab('agents')" data-i18n="tabs.agents">Agentes</button>
+        <button class="settings-tab" onclick="switchTab('sources')" data-i18n="tabs.sources">Fuentes</button>
+        <button class="settings-tab" onclick="switchTab('memory')" data-i18n="tabs.memory">Memoria</button>
+        <button class="settings-tab" onclick="switchTab('history')" data-i18n="tabs.history">Historial</button>
+        <button class="settings-tab" onclick="switchTab('logs')" data-i18n="tabs.logs">Registros</button>
+        <button class="settings-tab" onclick="switchTab('exec')" data-i18n="tabs.exec">Sandbox</button>
+        <button class="settings-tab" onclick="switchTab('mesh')" data-i18n="tabs.mesh">Red</button>
+        <button class="settings-tab" onclick="switchTab('tasks')" data-i18n="tabs.tasks">Tareas</button>
+        <button class="settings-tab" onclick="switchTab('models')" data-i18n="tabs.models">Modelos</button>
+        <button class="settings-tab" onclick="switchTab('voice')" data-i18n="tabs.voice">Voz</button>
       </div>
       <!-- Agents -->
       <div id="tab-agents" class="tab-content active">
-        <h3>Seleccionar agente</h3>
+        <h3 data-i18n="selectAgent">Seleccionar agente</h3>
         <div id="agents-list"></div>
       </div>
       <!-- Sources -->
       <div id="tab-sources" class="tab-content">
-        <h3>Carpetas conectadas</h3>
+        <h3 data-i18n="connectedFolders">Carpetas conectadas</h3>
         <div id="connected-chips" class="folder-chips"></div>
         <div style="display:flex;gap:6px;flex-wrap:wrap;margin:8px 0;">
           <button class="folder-shortcut" onclick="connectPreset('desktop')">+ Desktop</button>
           <button class="folder-shortcut" onclick="connectPreset('docs')">+ Docs</button>
-          <button class="folder-shortcut" onclick="pickFolder()">+ Elegir...</button>
+          <button class="folder-shortcut" onclick="pickFolder()" data-i18n="choose">+ Elegir...</button>
         </div>
-        <h3>Auto-ingesta</h3>
+        <h3 data-i18n="autoIngest">Auto-ingesta</h3>
         <div id="sources-list">Detecting...</div>
-        <br><button onclick="saveWatchers()" class="settings-action primary">Guardar</button>
+        <br><button onclick="saveWatchers()" class="settings-action primary" data-i18n="save">Guardar</button>
       </div>
       <!-- Memory -->
       <div id="tab-memory" class="tab-content">
-        <h3>Memoria persistente (Mem0)</h3>
+        <h3 data-i18n="persistentMemory">Memoria persistente (Mem0)</h3>
         <div id="memory-list" style="max-height:calc(100vh - 300px);overflow-y:auto;"></div>
         <div id="research-context" style="display:none;">
-          <h3>Contexto de investigaci&oacute;n (Hindsight)</h3>
-          <div id="rc-factual" class="rc-network"><h4>Hechos conocidos</h4></div>
-          <div id="rc-experiential" class="rc-network"><h4>Sesiones pasadas</h4></div>
-          <div id="rc-beliefs" class="rc-network"><h4>Metas inferidas</h4></div>
+          <h3 data-i18n="researchContext">Contexto de investigaci&oacute;n (Hindsight)</h3>
+          <div id="rc-factual" class="rc-network"><h4 data-i18n="knownFacts">Hechos conocidos</h4></div>
+          <div id="rc-experiential" class="rc-network"><h4 data-i18n="pastSessions">Sesiones pasadas</h4></div>
+          <div id="rc-beliefs" class="rc-network"><h4 data-i18n="inferredGoals">Metas inferidas</h4></div>
         </div>
         <div style="margin-top:12px;">
-          <button onclick="exportMemories()" class="settings-action secondary" style="width:100%;">&#128229; Export my memories</button>
-          <p style="font-size:0.62rem;color:var(--faint);margin-top:6px;line-height:1.4;">Downloads all memories as JSON. Your data is yours — take it anywhere.</p>
+          <button onclick="exportMemories()" class="settings-action secondary" style="width:100%;" data-i18n="exportMemories">&#128229; Export my memories</button>
+          <p style="font-size:0.62rem;color:var(--faint);margin-top:6px;line-height:1.4;" data-i18n="exportMemoriesHint">Downloads all memories as JSON. Your data is yours — take it anywhere.</p>
         </div>
       </div>
       <!-- History -->
       <div id="tab-history" class="tab-content">
-        <h3>Conversaciones recientes</h3>
+        <h3 data-i18n="recentConversations">Conversaciones recientes</h3>
         <div id="session-history-list" style="max-height:calc(100vh - 200px);overflow-y:auto;"></div>
       </div>
       <!-- Logs -->
       <div id="tab-logs" class="tab-content">
-        <h3>Registro de hoy</h3>
+        <h3 data-i18n="todayLog">Registro de hoy</h3>
         <div id="log-integrity"></div>
         <div id="log-list" style="max-height:calc(100vh - 300px);overflow-y:auto;"></div>
         <div style="display:flex;gap:6px;margin-top:10px;">
-          <button onclick="verifyLog()" class="settings-action secondary" style="flex:1;">Verificar</button>
-          <button onclick="exportLog()" class="settings-action secondary" style="flex:1;">Exportar .md</button>
+          <button onclick="verifyLog()" class="settings-action secondary" style="flex:1;" data-i18n="verify">Verificar</button>
+          <button onclick="exportLog()" class="settings-action secondary" style="flex:1;" data-i18n="exportLog">Exportar .md</button>
         </div>
       </div>
       <!-- Sandbox / Exec -->
       <div id="tab-exec" class="tab-content">
-        <h3>Historial de ejecuci&oacute;n</h3>
+        <h3 data-i18n="execHistory">Historial de ejecuci&oacute;n</h3>
         <div id="exec-list" style="max-height:calc(100vh - 200px);overflow-y:auto;"></div>
       </div>
       <!-- Mesh -->
       <div id="tab-mesh" class="tab-content">
-        <h3>Red Local / Local Network</h3>
+        <h3 data-i18n="localNetwork">Red Local / Local Network</h3>
         <div class="mesh-status">
           <span id="mesh-dot" class="mesh-dot offline"></span>
-          <span id="mesh-label" class="mesh-label">Verificando...</span>
+          <span id="mesh-label" class="mesh-label" data-i18n="checking">Verificando...</span>
         </div>
-        <p id="mesh-hint" class="mesh-hint">Conecta un dispositivo Meshtastic para activar la red local.</p>
+        <p id="mesh-hint" class="mesh-hint" data-i18n="meshHint">Conecta un dispositivo Meshtastic para activar la red local.</p>
       </div>
       <!-- Tasks -->
       <div id="tab-tasks" class="tab-content">
-        <h3>Tareas aut&oacute;nomas</h3>
-        <p class="demo-section-label">Demos r&aacute;pidos</p>
+        <h3 data-i18n="autonomousTasks">Tareas aut&oacute;nomas</h3>
+        <p class="demo-section-label" data-i18n="quickDemos">Demos r&aacute;pidos</p>
         <div class="demo-tiles">
           <button class="demo-tile" onclick="runDemo('analyze_project_state')">
             <span class="dt-icon">&#128202;</span>
@@ -526,14 +629,39 @@
             <span class="dt-desc">Score grant alignment with COANA profile &middot; draft abstract</span>
           </button>
         </div>
-        <p class="demo-section-label">Nueva tarea</p>
+        <p class="demo-section-label" data-i18n="newTask">Nueva tarea</p>
         <div class="task-new-row">
-          <input type="text" id="task-goal-input" placeholder="Describe la tarea / Describe the task...">
-          <button onclick="createTask()">Crear</button>
+          <input type="text" id="task-goal-input" placeholder="Describe la tarea / Describe the task..." data-i18n-placeholder="taskPlaceholder">
+          <button onclick="createTask()" data-i18n="create">Crear</button>
         </div>
         <div id="tasks-list" style="max-height:calc(100vh - 420px);overflow-y:auto;"></div>
       </div>
-      <br><button onclick="toggleSettings()" class="settings-action secondary">Cerrar</button>
+      <!-- Models tab -->
+      <div id="tab-models" class="tab-content">
+        <h3 data-i18n="modelRecommendations">Mejores modelos disponibles</h3>
+        <p style="font-size:0.72rem;color:var(--faint);margin-bottom:10px;" data-i18n="modelHint">Modelos que mejoran la calidad y caben en tu RAM.</p>
+        <div id="models-list"><div style="color:var(--faint);font-size:0.72rem;padding:8px 0;">Cargando...</div></div>
+        <div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--divider);">
+          <div style="font-size:0.68rem;color:var(--muted);margin-bottom:6px;" data-i18n="currentModel">Modelo activo:</div>
+          <div id="current-model-label" style="font-size:0.82rem;color:var(--text);font-weight:500;">—</div>
+        </div>
+      </div>
+      <!-- Voice tab -->
+      <div id="tab-voice" class="tab-content">
+        <h3 data-i18n="voiceSettings">Configuración de voz</h3>
+        <div style="margin-bottom:12px;">
+          <label style="font-size:0.75rem;color:var(--muted);display:block;margin-bottom:6px;" data-i18n="selectVoice">Seleccionar voz:</label>
+          <select id="voice-select" style="width:100%;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius-md);color:var(--text);padding:7px 10px;font-family:inherit;font-size:0.78rem;outline:none;">
+            <option value="">Cargando voces...</option>
+          </select>
+        </div>
+        <div style="display:flex;gap:8px;">
+          <button onclick="previewVoice()" class="settings-action secondary" style="flex:1;" data-i18n="preview">▶ Previsualizar</button>
+          <button onclick="saveVoicePreference()" class="settings-action primary" style="flex:1;" data-i18n="save">Guardar</button>
+        </div>
+        <div style="margin-top:12px;font-size:0.68rem;color:var(--faint);" id="tts-engine-label"></div>
+      </div>
+      <br><button onclick="toggleSettings()" class="settings-action secondary" data-i18n="close">Cerrar</button>
     </div>
   </div>
   <div id="canvas-container"></div>
@@ -553,7 +681,7 @@
       <button class="btn-icon" id="clip-btn" onclick="openFilePicker()" title="Upload PDF/TXT">&#128206;</button>
       <input type="text" id="clay-input" placeholder="Pregunta algo... / Ask anything..." autocomplete="off">
       <button id="clay-send" onclick="handleSend()">Enviar</button>
-      <button class="btn-icon" id="sound-btn" onclick="toggleMute()" title="Mute / Stop">&#128266;</button>
+      <button class="btn-icon" id="sound-btn" onclick="toggleMute(event)" title="Mute / Stop">&#128266;</button>
     </div>
     <div id="workflow-row"></div>
     <div id="badges"></div>
@@ -686,25 +814,133 @@
       }
     }
 
-    // ═══ Mute ═══
-    function toggleMute(){
-      if(appState==='listening'){if(recognition){recognition.stop();recognition.abort();}removeBadge('voice');setAppState('muted');setTimeout(()=>{if(appState==='muted')setAppState('idle');},1500);return;}
-      if(appState==='speaking'){window.speechSynthesis.cancel();setAppState('muted');setTimeout(()=>{if(appState==='muted')setAppState('idle');},1500);return;}
+    // ═══ Mute / Stop ═══
+    function toggleMute(event){
+      // Never navigate or submit forms — always stop here
+      if(event){event.preventDefault();event.stopPropagation();}
+      // Stop any in-flight streaming request
+      if(window._streamAbortController){
+        try{window._streamAbortController.abort();}catch(e){}
+        window._streamAbortController=null;
+      }
+      // Stop browser TTS audio
+      if('speechSynthesis' in window) window.speechSynthesis.cancel();
+      // If currently listening, stop recognition
+      if(appState==='listening'){
+        try{recognition&&recognition.stop();}catch(e){}
+        try{recognition&&recognition.abort();}catch(e){}
+        removeBadge('voice');
+        setAppState('idle');
+        return;
+      }
+      // If thinking or speaking, we've already aborted — go idle
+      if(appState==='thinking'||appState==='speaking'){
+        setAppState('idle');
+        return;
+      }
+      // Toggle voice output on/off when idle
       voiceOutputEnabled=!voiceOutputEnabled;
       document.getElementById('sound-btn').innerHTML=voiceOutputEnabled?'\uD83D\uDD0A':'\uD83D\uDD07';
-      showBadge('voice',voiceOutputEnabled?'Voz activada':'Voz desactivada',false);setTimeout(()=>removeBadge('voice'),1500);
+      showBadge('voice',voiceOutputEnabled?'Voz activada':'Voz desactivada',false);
+      setTimeout(()=>removeBadge('voice'),1500);
     }
 
     // ═══ Voice output ═══
-    function speakText(text){
-      if(!voiceOutputEnabled||!('speechSynthesis' in window)) return;
+    let _selectedVoice = null;  // null = auto-pick best
+    let _ttsEngine = 'browser'; // 'kokoro' | 'browser'
+
+    function _pickBestVoice(lang) {
+      if (!('speechSynthesis' in window)) return null;
+      const voices = window.speechSynthesis.getVoices();
+      if (!voices.length) return null;
+      // Preference order for macOS / iOS
+      const preferred = ['Samantha', 'Alex', 'Karen', 'Moira', 'Daniel'];
+      for (const name of preferred) {
+        const v = voices.find(v => v.name.startsWith(name));
+        if (v) return v;
+      }
+      // Fallback: first voice matching the language
+      return voices.find(v => v.lang.startsWith(lang.split('-')[0])) || voices[0] || null;
+    }
+
+    async function speakText(text) {
+      if (!voiceOutputEnabled) return;
       window.speechSynthesis.cancel();
-      const u=new SpeechSynthesisUtterance(text.substring(0,2000));
-      const es=(text.match(/\b(de|el|la|los|las|en|que|por|con|para|una|del)\b/gi)||[]).length;
-      u.lang=es>3?'es-PR':'en-US'; u.rate=0.95;
-      u.onstart=()=>setAppState('speaking');
-      u.onend=()=>{if(appState==='speaking')setAppState('idle');};
+      // Try Kokoro API first
+      try {
+        const r = await fetch('/api/tts?' + new URLSearchParams({text: text.substring(0,1500)}));
+        if (r.ok) {
+          const d = await r.json();
+          if (!d.fallback) {
+            // Kokoro returned audio — play it (future: play blob)
+            _ttsEngine = 'kokoro';
+            setAppState('speaking');
+            // placeholder: actual audio playback when Kokoro returns binary
+            setTimeout(() => { if (appState==='speaking') setAppState('idle'); }, 3000);
+            return;
+          }
+        }
+      } catch(e) { /* fall through to browser */ }
+      // Browser SpeechSynthesis fallback
+      if (!('speechSynthesis' in window)) return;
+      _ttsEngine = 'browser';
+      const u = new SpeechSynthesisUtterance(text.substring(0, 2000));
+      const esWords = (text.match(/\b(de|el|la|los|las|en|que|por|con|para|una|del)\b/gi)||[]).length;
+      u.lang = esWords > 3 ? 'es-PR' : 'en-US';
+      u.rate = 0.95;
+      // Use user-selected voice, or auto-pick
+      const voice = _selectedVoice || _pickBestVoice(u.lang);
+      if (voice) u.voice = voice;
+      u.onstart = () => setAppState('speaking');
+      u.onend = () => { if (appState === 'speaking') setAppState('idle'); };
       window.speechSynthesis.speak(u);
+    }
+
+    // Voice selector
+    function _loadVoices() {
+      const sel = document.getElementById('voice-select');
+      if (!sel || !('speechSynthesis' in window)) return;
+      const voices = window.speechSynthesis.getVoices();
+      if (!voices.length) return;
+      const saved = localStorage.getItem('clay_voice_name');
+      sel.innerHTML = '<option value="">— Auto (best) —</option>';
+      voices.forEach(v => {
+        const opt = document.createElement('option');
+        opt.value = v.name;
+        opt.textContent = v.name + ' (' + v.lang + ')';
+        if (saved && v.name === saved) { opt.selected = true; _selectedVoice = v; }
+        sel.appendChild(opt);
+      });
+      // Update engine label
+      const label = document.getElementById('tts-engine-label');
+      if (label) label.textContent = 'Engine: browser SpeechSynthesis' + (saved ? ' · ' + saved : ' · auto');
+    }
+    if ('speechSynthesis' in window) {
+      window.speechSynthesis.onvoiceschanged = _loadVoices;
+      // Chrome loads voices async; Safari/Firefox may have them immediately
+      setTimeout(_loadVoices, 300);
+    }
+
+    function previewVoice() {
+      const sel = document.getElementById('voice-select');
+      const voiceName = sel ? sel.value : '';
+      const voices = 'speechSynthesis' in window ? window.speechSynthesis.getVoices() : [];
+      _selectedVoice = voices.find(v => v.name === voiceName) || null;
+      speakText('Hello! This is OpenClay, running locally on your machine.');
+    }
+
+    function saveVoicePreference() {
+      const sel = document.getElementById('voice-select');
+      if (!sel) return;
+      const voiceName = sel.value;
+      const voices = 'speechSynthesis' in window ? window.speechSynthesis.getVoices() : [];
+      _selectedVoice = voices.find(v => v.name === voiceName) || null;
+      if (voiceName) localStorage.setItem('clay_voice_name', voiceName);
+      else localStorage.removeItem('clay_voice_name');
+      const label = document.getElementById('tts-engine-label');
+      if (label) label.textContent = 'Engine: browser SpeechSynthesis' + (voiceName ? ' · ' + voiceName : ' · auto');
+      showBadge('voice', '✓ Voice saved', false);
+      setTimeout(() => removeBadge('voice'), 2000);
     }
 
     // ═══ File upload ═══
@@ -818,6 +1054,77 @@
       document.querySelectorAll('.tab-content').forEach(t=>t.classList.remove('active'));
       document.querySelector(`[onclick="switchTab('${name}')"]`).classList.add('active');
       document.getElementById('tab-'+name).classList.add('active');
+      if (name === 'models') loadModels();
+      if (name === 'voice') _loadVoices();
+    }
+
+    // ═══ Model recommendations ═══
+    async function loadModels() {
+      const list = document.getElementById('models-list');
+      const label = document.getElementById('current-model-label');
+      if (!list) return;
+      list.innerHTML = '<div style="font-size:0.72rem;color:var(--faint);padding:8px 0">Checking…</div>';
+      try {
+        const r = await fetch('/api/models/recommendations');
+        if (!r.ok) throw new Error('status ' + r.status);
+        const d = await r.json();
+        if (label) label.textContent = d.best_model || '—';
+        const recs = d.recommendations || [];
+        if (!recs.length) {
+          list.innerHTML = '<div style="font-size:0.72rem;color:var(--faint);padding:8px 0">✓ Already running the best available model.</div>';
+          return;
+        }
+        list.innerHTML = '';
+        recs.forEach(rec => {
+          const row = document.createElement('div');
+          row.className = 'model-rec-row';
+          row.style.cssText = 'display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--divider);font-size:0.72rem;';
+          row.innerHTML = `
+            <div style="flex:1;min-width:0;">
+              <div style="color:var(--text);font-weight:600;">${escapeHtml(rec.name)}</div>
+              <div style="color:var(--faint);margin-top:2px;">${escapeHtml(rec.why||'')} · ${rec.ram_required_gb}GB RAM</div>
+            </div>
+            <button class="settings-action primary" style="font-size:0.68rem;padding:4px 10px;white-space:nowrap;"
+              onclick="installModel('${rec.name}', this)">Install</button>`;
+          list.appendChild(row);
+        });
+      } catch(e) {
+        list.innerHTML = '<div style="font-size:0.72rem;color:var(--faint);padding:8px 0">Could not load recommendations.</div>';
+      }
+    }
+
+    async function installModel(name, btn) {
+      btn.disabled = true;
+      btn.textContent = '…';
+      const row = btn.closest('.model-rec-row');
+      const progress = document.createElement('div');
+      progress.style.cssText = 'font-size:0.65rem;color:var(--muted);margin-top:4px;';
+      row.appendChild(progress);
+      try {
+        const r = await fetch('/api/models/install', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({name})
+        });
+        if (!r.ok) throw new Error('status ' + r.status);
+        const reader = r.body.getReader();
+        const dec = new TextDecoder();
+        while (true) {
+          const {done, value} = await reader.read();
+          if (done) break;
+          const lines = dec.decode(value, {stream:true}).split('\n').filter(l=>l.trim());
+          for (const line of lines) {
+            try {
+              const d = JSON.parse(line);
+              if (d.status) progress.textContent = d.status + (d.percent ? ' ' + d.percent + '%' : '');
+              if (d.done) { btn.textContent = '✓'; btn.style.background = '#059669'; progress.textContent = 'Installed!'; loadModels(); }
+              if (d.error) { btn.textContent = '✗'; btn.disabled = false; progress.textContent = 'Error: ' + d.error; }
+            } catch(e) {}
+          }
+        }
+      } catch(e) {
+        btn.textContent = 'Retry'; btn.disabled = false; progress.textContent = 'Failed: ' + e.message;
+      }
     }
 
     // ═══ Agents ═══
@@ -1305,53 +1612,197 @@
         title: 'OpenClay',
         subtitle: 'COANA LABS · LOCAL · PRIVADO · TUYO',
         placeholder: 'Pregunta algo... / Ask anything...',
+        taskPlaceholder: 'Describe la tarea...',
         hint: 'todo es local  /  everything is local',
-        settings_label: 'Agentes',
-        tab_agents: 'Agentes', tab_sources: 'Fuentes', tab_memory: 'Memoria',
-        tab_history: 'Historial', tab_logs: 'Registros', tab_exec: 'Sandbox',
-        tab_mesh: 'Red', tab_tasks: 'Tareas',
         hw_welcome: '¡Bienvenido! Tu sistema puede responder en aprox.',
         projects_title: 'Proyectos guardados',
-        continue_label: 'Continuar',
+        'tabs.agents': 'Agentes', 'tabs.sources': 'Fuentes', 'tabs.memory': 'Memoria',
+        'tabs.history': 'Historial', 'tabs.logs': 'Registros', 'tabs.exec': 'Sandbox',
+        'tabs.mesh': 'Red', 'tabs.tasks': 'Tareas', 'tabs.models': 'Modelos', 'tabs.voice': 'Voz',
+        selectAgent: 'Seleccionar agente',
+        connectedFolders: 'Carpetas conectadas',
+        choose: '+ Elegir...',
+        autoIngest: 'Auto-ingesta',
+        save: 'Guardar',
+        persistentMemory: 'Memoria persistente (Mem0)',
+        researchContext: 'Contexto de investigación (Hindsight)',
+        knownFacts: 'Hechos conocidos',
+        pastSessions: 'Sesiones pasadas',
+        inferredGoals: 'Metas inferidas',
+        exportMemories: '⬇ Exportar memorias',
+        exportMemoriesHint: 'Descarga tus memorias como JSON. Tus datos son tuyos.',
+        recentConversations: 'Conversaciones recientes',
+        todayLog: 'Registro de hoy',
+        verify: 'Verificar',
+        exportLog: 'Exportar .md',
+        execHistory: 'Historial de ejecución',
+        localNetwork: 'Red Local',
+        checking: 'Verificando...',
+        meshHint: 'Conecta un dispositivo Meshtastic para activar la red local.',
+        autonomousTasks: 'Tareas autónomas',
+        quickDemos: 'Demos rápidos',
+        newTask: 'Nueva tarea',
+        create: 'Crear',
+        close: 'Cerrar',
+        modelRecommendations: 'Mejores modelos disponibles',
+        modelHint: 'Modelos que mejoran la calidad y caben en tu RAM.',
+        currentModel: 'Modelo activo:',
+        voiceSettings: 'Configuración de voz',
+        selectVoice: 'Seleccionar voz:',
+        preview: '▶ Previsualizar',
+        privacyText: '100% local · nada sale de tu computadora',
+        sendBtn: 'Enviar',
+        newConversation: '＋ Nueva conversación',
+        todayGroup: 'Hoy', yesterdayGroup: 'Ayer',
+        thisWeekGroup: 'Esta semana', earlierGroup: 'Antes',
+        pinnedGroup: 'Fijados',
       },
       en: {
         title: 'OpenClay',
         subtitle: 'COANA LABS · LOCAL · PRIVATE · YOURS',
         placeholder: 'Ask anything...',
+        taskPlaceholder: 'Describe the task...',
         hint: 'everything is local  /  todo es local',
-        settings_label: 'Agents',
-        tab_agents: 'Agents', tab_sources: 'Sources', tab_memory: 'Memory',
-        tab_history: 'History', tab_logs: 'Logs', tab_exec: 'Sandbox',
-        tab_mesh: 'Network', tab_tasks: 'Tasks',
         hw_welcome: 'Welcome! Your system can respond in about',
         projects_title: 'Saved projects',
-        continue_label: 'Continue',
+        'tabs.agents': 'Agents', 'tabs.sources': 'Sources', 'tabs.memory': 'Memory',
+        'tabs.history': 'History', 'tabs.logs': 'Logs', 'tabs.exec': 'Sandbox',
+        'tabs.mesh': 'Network', 'tabs.tasks': 'Tasks', 'tabs.models': 'Models', 'tabs.voice': 'Voice',
+        selectAgent: 'Select agent',
+        connectedFolders: 'Connected folders',
+        choose: '+ Choose...',
+        autoIngest: 'Auto-ingest',
+        save: 'Save',
+        persistentMemory: 'Persistent memory (Mem0)',
+        researchContext: 'Research context (Hindsight)',
+        knownFacts: 'Known facts',
+        pastSessions: 'Past sessions',
+        inferredGoals: 'Inferred goals',
+        exportMemories: '⬇ Export memories',
+        exportMemoriesHint: 'Downloads all memories as JSON. Your data is yours.',
+        recentConversations: 'Recent conversations',
+        todayLog: "Today's log",
+        verify: 'Verify',
+        exportLog: 'Export .md',
+        execHistory: 'Execution history',
+        localNetwork: 'Local network',
+        checking: 'Checking...',
+        meshHint: 'Connect a Meshtastic device to activate the local network.',
+        autonomousTasks: 'Autonomous tasks',
+        quickDemos: 'Quick demos',
+        newTask: 'New task',
+        create: 'Create',
+        close: 'Close',
+        modelRecommendations: 'Better models available',
+        modelHint: 'Models that improve quality and fit in your RAM.',
+        currentModel: 'Active model:',
+        voiceSettings: 'Voice settings',
+        selectVoice: 'Select voice:',
+        preview: '▶ Preview',
+        privacyText: '100% local · nothing leaves your computer',
+        sendBtn: 'Send',
+        newConversation: '＋ New conversation',
+        todayGroup: 'Today', yesterdayGroup: 'Yesterday',
+        thisWeekGroup: 'This week', earlierGroup: 'Earlier',
+        pinnedGroup: 'Pinned',
       },
       fr: {
         title: 'OpenClay',
         subtitle: 'COANA LABS · LOCAL · PRIVÉ · À TOI',
         placeholder: 'Pose une question...',
-        hint: 'tout est local  /  todo es local',
-        settings_label: 'Agents',
-        tab_agents: 'Agents', tab_sources: 'Sources', tab_memory: 'Mémoire',
-        tab_history: 'Historique', tab_logs: 'Journaux', tab_exec: 'Sandbox',
-        tab_mesh: 'Réseau', tab_tasks: 'Tâches',
+        taskPlaceholder: 'Décris la tâche...',
+        hint: 'tout est local  /  everything is local',
         hw_welcome: 'Bienvenue ! Votre système peut répondre en environ',
         projects_title: 'Projets sauvegardés',
-        continue_label: 'Continuer',
+        'tabs.agents': 'Agents', 'tabs.sources': 'Sources', 'tabs.memory': 'Mémoire',
+        'tabs.history': 'Historique', 'tabs.logs': 'Journaux', 'tabs.exec': 'Sandbox',
+        'tabs.mesh': 'Réseau', 'tabs.tasks': 'Tâches', 'tabs.models': 'Modèles', 'tabs.voice': 'Voix',
+        selectAgent: 'Choisir un agent',
+        connectedFolders: 'Dossiers connectés',
+        choose: '+ Choisir...',
+        autoIngest: 'Auto-ingestion',
+        save: 'Enregistrer',
+        persistentMemory: 'Mémoire persistante (Mem0)',
+        researchContext: 'Contexte de recherche (Hindsight)',
+        knownFacts: 'Faits connus',
+        pastSessions: 'Sessions passées',
+        inferredGoals: 'Objectifs inférés',
+        exportMemories: '⬇ Exporter les mémoires',
+        exportMemoriesHint: 'Télécharge toutes les mémoires en JSON.',
+        recentConversations: 'Conversations récentes',
+        todayLog: "Journal d'aujourd'hui",
+        verify: 'Vérifier',
+        exportLog: 'Exporter .md',
+        execHistory: "Historique d'exécution",
+        localNetwork: 'Réseau local',
+        checking: 'Vérification...',
+        meshHint: 'Connectez un appareil Meshtastic pour activer le réseau local.',
+        autonomousTasks: 'Tâches autonomes',
+        quickDemos: 'Démos rapides',
+        newTask: 'Nouvelle tâche',
+        create: 'Créer',
+        close: 'Fermer',
+        modelRecommendations: 'Meilleurs modèles disponibles',
+        modelHint: 'Modèles qui améliorent la qualité et tiennent en RAM.',
+        currentModel: 'Modèle actif :',
+        voiceSettings: 'Paramètres vocaux',
+        selectVoice: 'Sélectionner une voix :',
+        preview: '▶ Prévisualiser',
+        privacyText: '100% local · rien ne quitte votre ordinateur',
+        sendBtn: 'Envoyer',
+        newConversation: '＋ Nouvelle conversation',
+        todayGroup: "Aujourd'hui", yesterdayGroup: 'Hier',
+        thisWeekGroup: 'Cette semaine', earlierGroup: 'Plus tôt',
+        pinnedGroup: 'Épinglés',
       },
       pt: {
         title: 'OpenClay',
         subtitle: 'COANA LABS · LOCAL · PRIVADO · SEU',
         placeholder: 'Pergunte algo...',
+        taskPlaceholder: 'Descreva a tarefa...',
         hint: 'tudo é local  /  everything is local',
-        settings_label: 'Agentes',
-        tab_agents: 'Agentes', tab_sources: 'Fontes', tab_memory: 'Memória',
-        tab_history: 'Histórico', tab_logs: 'Registros', tab_exec: 'Sandbox',
-        tab_mesh: 'Rede', tab_tasks: 'Tarefas',
         hw_welcome: 'Bem-vindo! Seu sistema pode responder em aprox.',
         projects_title: 'Projetos salvos',
-        continue_label: 'Continuar',
+        'tabs.agents': 'Agentes', 'tabs.sources': 'Fontes', 'tabs.memory': 'Memória',
+        'tabs.history': 'Histórico', 'tabs.logs': 'Registros', 'tabs.exec': 'Sandbox',
+        'tabs.mesh': 'Rede', 'tabs.tasks': 'Tarefas', 'tabs.models': 'Modelos', 'tabs.voice': 'Voz',
+        selectAgent: 'Selecionar agente',
+        connectedFolders: 'Pastas conectadas',
+        choose: '+ Escolher...',
+        autoIngest: 'Auto-ingestão',
+        save: 'Salvar',
+        persistentMemory: 'Memória persistente (Mem0)',
+        researchContext: 'Contexto de pesquisa (Hindsight)',
+        knownFacts: 'Fatos conhecidos',
+        pastSessions: 'Sessões anteriores',
+        inferredGoals: 'Metas inferidas',
+        exportMemories: '⬇ Exportar memórias',
+        exportMemoriesHint: 'Baixa todas as memórias como JSON.',
+        recentConversations: 'Conversas recentes',
+        todayLog: 'Registro de hoje',
+        verify: 'Verificar',
+        exportLog: 'Exportar .md',
+        execHistory: 'Histórico de execução',
+        localNetwork: 'Rede local',
+        checking: 'Verificando...',
+        meshHint: 'Conecte um dispositivo Meshtastic para ativar a rede local.',
+        autonomousTasks: 'Tarefas autônomas',
+        quickDemos: 'Demos rápidos',
+        newTask: 'Nova tarefa',
+        create: 'Criar',
+        close: 'Fechar',
+        modelRecommendations: 'Melhores modelos disponíveis',
+        modelHint: 'Modelos que melhoram a qualidade e cabem na sua RAM.',
+        currentModel: 'Modelo ativo:',
+        voiceSettings: 'Configurações de voz',
+        selectVoice: 'Selecionar voz:',
+        preview: '▶ Pré-visualizar',
+        privacyText: '100% local · nada sai do seu computador',
+        sendBtn: 'Enviar',
+        newConversation: '＋ Nova conversa',
+        todayGroup: 'Hoje', yesterdayGroup: 'Ontem',
+        thisWeekGroup: 'Esta semana', earlierGroup: 'Antes',
+        pinnedGroup: 'Fixados',
       }
     };
     function cycleLang() {
@@ -1362,12 +1813,34 @@
     }
     function applyLang() {
       const t = TRANSLATIONS[currentLang] || TRANSLATIONS.es;
+      // Input placeholder
       const inp = document.getElementById('clay-input');
       if (inp) inp.placeholder = t.placeholder;
+      // Subtitle
       const sub = document.querySelector('#title p');
       if (sub) sub.textContent = t.subtitle;
+      // Projects panel header
       const ph = document.getElementById('projects-panel-header');
-      if (ph) ph.querySelector('span').textContent = t.projects_title;
+      if (ph) { const s = ph.querySelector('span'); if (s) s.textContent = t.projects_title; }
+      // Send button
+      const sb = document.getElementById('clay-send');
+      if (sb) sb.textContent = t.sendBtn || 'Enviar';
+      // Privacy text
+      const pt = document.getElementById('privacy-text');
+      if (pt) pt.textContent = t.privacyText || '100% local · nada sale de tu computadora';
+      // All data-i18n elements
+      document.querySelectorAll('[data-i18n]').forEach(el => {
+        const key = el.getAttribute('data-i18n');
+        if (t[key] !== undefined) el.textContent = t[key];
+      });
+      // data-i18n-placeholder elements
+      document.querySelectorAll('[data-i18n-placeholder]').forEach(el => {
+        const key = el.getAttribute('data-i18n-placeholder');
+        if (t[key] !== undefined) el.placeholder = t[key];
+      });
+      // Sidebar new conversation button
+      const ncBtn = document.getElementById('sidebar-new-conv');
+      if (ncBtn) ncBtn.textContent = t.newConversation || '＋ Nueva conversación';
     }
 
     // ═══ Hardware banner ═══
@@ -1499,6 +1972,201 @@
         });
       } catch(e) {}
     }
+
+    // ═══ Projects Sidebar ═══
+    let _projPinned = new Set(JSON.parse(localStorage.getItem('clay_pinned') || '[]'));
+    let _projSidebarOpen = localStorage.getItem('clay_sidebar_open') === '1';
+    let _activeProjectId = null;
+
+    function _savePinned() { localStorage.setItem('clay_pinned', JSON.stringify([..._projPinned])); }
+
+    function toggleProjSidebar() {
+      _projSidebarOpen = !_projSidebarOpen;
+      localStorage.setItem('clay_sidebar_open', _projSidebarOpen ? '1' : '0');
+      const sidebar = document.getElementById('proj-sidebar');
+      const toggle = document.getElementById('proj-sidebar-toggle');
+      sidebar.classList.toggle('open', _projSidebarOpen);
+      toggle.textContent = _projSidebarOpen ? '‹' : '›';
+      if (_projSidebarOpen) loadProjSidebar();
+    }
+
+    async function loadProjSidebar() {
+      const list = document.getElementById('proj-sidebar-list');
+      if (!list) return;
+      try {
+        const r = await fetch('/api/projects/list');
+        if (!r.ok) throw new Error();
+        const d = await r.json();
+        _renderProjSidebar(d.projects || []);
+      } catch(e) {
+        list.innerHTML = '<div class="psb-group-label" style="padding-top:14px;color:var(--faint);">Sin proyectos aún</div>';
+      }
+    }
+
+    function _groupProjects(projects) {
+      const now = Date.now();
+      const DAY = 86400000;
+      const pinned = [], today = [], yesterday = [], thisWeek = [], earlier = [];
+      projects.forEach(p => {
+        if (_projPinned.has(p.id)) { pinned.push(p); return; }
+        const age = now - new Date(p.updated_at || p.created_at || 0).getTime();
+        if (age < DAY) today.push(p);
+        else if (age < DAY * 2) yesterday.push(p);
+        else if (age < DAY * 7) thisWeek.push(p);
+        else earlier.push(p);
+      });
+      return { pinned, today, yesterday, thisWeek, earlier };
+    }
+
+    function _renderProjSidebar(projects) {
+      const list = document.getElementById('proj-sidebar-list');
+      if (!list) return;
+      const t = TRANSLATIONS[currentLang] || TRANSLATIONS.es;
+      const groups = _groupProjects(projects);
+      list.innerHTML = '';
+      const sections = [
+        [t.pinnedGroup || 'Fijados', groups.pinned],
+        [t.todayGroup || 'Hoy', groups.today],
+        [t.yesterdayGroup || 'Ayer', groups.yesterday],
+        [t.thisWeekGroup || 'Esta semana', groups.thisWeek],
+        [t.earlierGroup || 'Antes', groups.earlier],
+      ];
+      let hasAny = false;
+      sections.forEach(([label, items]) => {
+        if (!items.length) return;
+        hasAny = true;
+        const lbl = document.createElement('div');
+        lbl.className = 'psb-group-label';
+        lbl.textContent = label;
+        list.appendChild(lbl);
+        items.forEach(p => list.appendChild(_makeProjItem(p)));
+      });
+      if (!hasAny) {
+        list.innerHTML = '<div class="psb-group-label" style="padding-top:14px;">Sin conversaciones guardadas.<br><span style="color:var(--faint);font-weight:400;">Las conversaciones se guardan automáticamente.</span></div>';
+      }
+    }
+
+    function _makeProjItem(p) {
+      const isPinned = _projPinned.has(p.id);
+      const date = new Date(p.updated_at || p.created_at || 0).toLocaleDateString('es-PR', {month:'short',day:'numeric'});
+      const item = document.createElement('div');
+      item.className = 'psb-item' + (_activeProjectId === p.id ? ' active' : '');
+      item.dataset.projId = p.id;
+      item.innerHTML = `
+        <span class="psb-name">${escapeHtml(p.name || 'Sin título')}${isPinned ? '<span class="psb-pin-badge" title="Pinned">📌</span>' : ''}</span>
+        <div class="psb-meta">${date} · ${p.message_count || 0} msgs</div>
+        <div class="psb-actions">
+          <button class="psb-act-btn" title="Rename" onclick="renameProject(event,'${p.id}','${(p.name||'').replace(/'/g,"\\'")}')">✏️</button>
+          <button class="psb-act-btn" title="${isPinned?'Unpin':'Pin'}" onclick="pinProject(event,'${p.id}')">${isPinned?'📍':'📌'}</button>
+          <button class="psb-act-btn del" title="Delete" onclick="deleteProjSidebar(event,'${p.id}','${(p.name||'').replace(/'/g,"\\'")}')">🗑</button>
+        </div>`;
+      item.addEventListener('click', (e) => {
+        if (e.target.closest('.psb-actions,.psb-rename-input')) return;
+        loadProjectSidebar(p);
+      });
+      return item;
+    }
+
+    function renameProject(e, id, currentName) {
+      e.stopPropagation();
+      const item = document.querySelector(`.psb-item[data-proj-id="${id}"]`);
+      if (!item) return;
+      const nameEl = item.querySelector('.psb-name');
+      const input = document.createElement('input');
+      input.className = 'psb-rename-input';
+      input.value = currentName;
+      nameEl.replaceWith(input);
+      input.focus(); input.select();
+      async function commit() {
+        const newName = input.value.trim() || currentName;
+        try {
+          await fetch('/api/projects/' + id + '/rename', {
+            method: 'POST', headers: {'Content-Type':'application/json'},
+            body: JSON.stringify({name: newName})
+          });
+        } catch(err) {}
+        loadProjSidebar();
+      }
+      input.addEventListener('blur', commit);
+      input.addEventListener('keydown', ev => {
+        if (ev.key === 'Enter') { ev.preventDefault(); input.blur(); }
+        if (ev.key === 'Escape') { loadProjSidebar(); }
+      });
+    }
+
+    function pinProject(e, id) {
+      e.stopPropagation();
+      if (_projPinned.has(id)) _projPinned.delete(id);
+      else _projPinned.add(id);
+      _savePinned();
+      loadProjSidebar();
+    }
+
+    function deleteProjSidebar(e, id, name) {
+      e.stopPropagation();
+      const confirmed = window.confirm(`¿Borrar "${name}"?`);
+      if (!confirmed) return;
+      _projPinned.delete(id);
+      _savePinned();
+      fetch('/api/projects/' + id, {method: 'DELETE'}).catch(() => {});
+      if (_activeProjectId === id) _activeProjectId = null;
+      loadProjSidebar();
+    }
+
+    function loadProjectSidebar(proj) {
+      _activeProjectId = proj.id;
+      // Mark active item
+      document.querySelectorAll('.psb-item').forEach(el => {
+        el.classList.toggle('active', el.dataset.projId === proj.id);
+      });
+      // Restore agent
+      if (proj.agent_name) selectAgent(proj.agent_name);
+      // Show project name badge
+      showBadge('proj', '📂 ' + (proj.name || 'Proyecto'), false);
+      setTimeout(() => removeBadge('proj'), 3000);
+      // Focus input with continuation hint
+      const inp = document.getElementById('clay-input');
+      if (inp) {
+        inp.placeholder = 'Continuando: ' + (proj.name || 'proyecto') + '…';
+        setTimeout(() => { inp.placeholder = 'Pregunta algo... / Ask anything...'; }, 6000);
+        inp.focus();
+      }
+    }
+
+    async function newConversation() {
+      // Auto-save current session before clearing
+      if (localHistory && localHistory.length > 0) {
+        await autoSaveProject('', '');
+      }
+      // Clear conversation state
+      localHistory = [];
+      if (typeof responseText !== 'undefined') responseText = '';
+      if (typeof displayedText !== 'undefined') displayedText = '';
+      if (typeof inputText !== 'undefined') inputText = '';
+      _activeProjectId = null;
+      const inp = document.getElementById('clay-input');
+      if (inp) { inp.value = ''; inp.placeholder = 'Pregunta algo... / Ask anything...'; }
+      // Reset canvas state if accessible
+      if (typeof setClayState === 'function') setClayState('idle');
+      // Reload sidebar to show the newly saved project
+      setTimeout(loadProjSidebar, 400);
+      showBadge('proj', '✓ Nueva conversación', false);
+      setTimeout(() => removeBadge('proj'), 2000);
+    }
+
+    // Init sidebar state on load
+    (function initProjSidebar() {
+      const sidebar = document.getElementById('proj-sidebar');
+      const toggle = document.getElementById('proj-sidebar-toggle');
+      if (!sidebar || !toggle) return;
+      if (_projSidebarOpen) {
+        sidebar.classList.add('open');
+        toggle.textContent = '‹';
+        loadProjSidebar();
+      } else {
+        toggle.textContent = '›';
+      }
+    })();
 
     updateStatus(); setInterval(updateStatus,15000);
     checkHardwareBanner();

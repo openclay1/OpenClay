@@ -65,3 +65,7 @@ tasks/
 projects/
 .claude/
 *.app
+
+# Docs — internal only
+docs/openclay_technical_draft.md
+docs/MONETIZATION.md
