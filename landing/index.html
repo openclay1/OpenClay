@@ -785,67 +785,26 @@
 
   <!-- Pricing -->
   <section id="pricing" style="background:var(--surface); border-top:1px solid var(--border);">
-    <div class="container" style="text-align:center;">
-      <div class="section-label">Pricing</div>
-      <h2 class="section-title">Simple, honest pricing</h2>
+    <div class="container" style="text-align:center; max-width:640px;">
+      <div class="section-label">Open Source</div>
+      <h2 class="section-title" style="font-size:clamp(1.8rem,4vw,2.8rem);">Free and open source.<br>Forever.</h2>
       <div class="section-divider"></div>
-      <p class="section-sub" style="margin:0 auto 48px;">
-        The free tier gives you everything you need to run private AI research.
-        Pro adds power-user features for teams and heavy workflows.
+      <p class="section-sub" style="margin:0 auto 40px;">
+        Every feature — memory, agents, Clay Code, orchestration — is available to everyone.
+        No license key. No credit card. No cloud. Just download and run.
       </p>
-      <div class="pricing-grid">
-        <!-- Free -->
-        <div class="pricing-card">
-          <div class="pricing-badge">Free</div>
-          <div class="pricing-name">OpenClay Free</div>
-          <div class="pricing-price">$0<span> / forever</span></div>
-          <p class="pricing-desc">Full local AI research. No credit card required. Your data never leaves your machine.</p>
-          <ul class="pricing-features">
-            <li><span class="li-check">&#10003;</span> All 5 specialist agents</li>
-            <li><span class="li-check">&#10003;</span> Persistent Mem0 memory</li>
-            <li><span class="li-check">&#10003;</span> Document analysis (PDF/TXT)</li>
-            <li><span class="li-check">&#10003;</span> Voice I/O</li>
-            <li><span class="li-check">&#10003;</span> Code sandbox</li>
-            <li><span class="li-check">&#10003;</span> Multilingual (ES/EN)</li>
-            <li><span class="li-check">&#10003;</span> Folder watchers</li>
-          </ul>
-          <a href="https://github.com/coanalabs/openclay" class="pricing-btn free-btn" data-umami-event="download_free">Download free</a>
-        </div>
-        <!-- Pro -->
-        <div class="pricing-card pro">
-          <div class="pricing-badge amber-badge">Pro</div>
-          <div class="pricing-name">OpenClay Pro</div>
-          <div class="pricing-price">$49<span> one-time</span></div>
-          <p class="pricing-desc">Unlock Clay Code, scheduled agents, and team features. One license, yours forever.</p>
-          <ul class="pricing-features">
-            <li><span class="li-check">&#10003;</span> Everything in Free</li>
-            <li><span class="li-check">&#10003;</span> Clay Code IDE (diff + preview)</li>
-            <li><span class="li-check">&#10003;</span> Multi-agent orchestration chains</li>
-            <li><span class="li-check">&#10003;</span> Scheduled autonomous tasks</li>
-            <li><span class="li-check">&#10003;</span> Priority model selection</li>
-            <li><span class="li-check">&#10003;</span> Export full memory history</li>
-            <li><span class="li-check">&#10003;</span> Lifetime updates</li>
-          </ul>
-          <a href="https://coanalabs.gumroad.com/l/openclay-pro" target="_blank" class="pricing-btn pro-btn" data-umami-event="cta_pro_click">Get Pro — $49</a>
-        </div>
+      <div style="display:flex;gap:16px;flex-wrap:wrap;justify-content:center;margin-bottom:40px;">
+        <a href="https://github.com/openclay1/OpenClay" target="_blank" class="btn-primary" style="display:inline-flex;align-items:center;gap:8px;font-size:1rem;padding:14px 32px;" data-umami-event="github_click">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.477 2 2 6.477 2 12c0 4.42 2.865 8.166 6.839 9.489.5.092.682-.217.682-.482 0-.237-.008-.866-.013-1.7-2.782.604-3.369-1.34-3.369-1.34-.454-1.156-1.11-1.464-1.11-1.464-.908-.62.069-.608.069-.608 1.003.07 1.531 1.03 1.531 1.03.892 1.529 2.341 1.087 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.11-4.555-4.943 0-1.091.39-1.984 1.029-2.683-.103-.253-.446-1.27.098-2.647 0 0 .84-.269 2.75 1.025A9.578 9.578 0 0 1 12 6.836c.85.004 1.705.114 2.504.336 1.909-1.294 2.747-1.025 2.747-1.025.546 1.377.203 2.394.1 2.647.64.699 1.028 1.592 1.028 2.683 0 3.842-2.339 4.687-4.566 4.935.359.309.678.919.678 1.852 0 1.336-.012 2.415-.012 2.743 0 .267.18.578.688.48C19.138 20.163 22 16.418 22 12c0-5.523-4.477-10-10-10z"/></svg>
+          View on GitHub
+        </a>
+        <a href="YOUR_GUMROAD_LINK" target="_blank" class="btn-secondary" style="display:inline-flex;align-items:center;gap:8px;font-size:1rem;padding:14px 32px;" data-umami-event="support_click">
+          Support the project →
+        </a>
       </div>
-    </div>
-  </section>
-
-  <!-- Waitlist -->
-  <section id="waitlist" class="waitlist-section">
-    <div class="container-narrow" style="text-align:center;">
-      <div class="section-label">Early access</div>
-      <h2 class="section-title">Join the waitlist</h2>
-      <div class="section-divider"></div>
-      <p class="section-sub" style="margin:0 auto 32px;">
-        Get notified when new features ship — including Clay Code Pro, mobile agent, and the Meshtastic mesh network.
+      <p style="font-size:0.8rem;color:var(--muted);">
+        MIT license · No data collected · Works offline · Built in Puerto Rico
       </p>
-      <form class="waitlist-form" onsubmit="handleWaitlist(event)" data-umami-event="waitlist_submit">
-        <input type="email" class="waitlist-input" placeholder="your@email.com" required id="waitlist-email">
-        <button type="submit" class="waitlist-btn">Join waitlist</button>
-      </form>
-      <p class="waitlist-note" id="waitlist-msg">No spam. Unsubscribe any time. Your email stays with COANA Labs only.</p>
     </div>
   </section>
 
@@ -853,9 +812,9 @@
   <footer>
     <a href="#" class="footer-logo">OpenClay</a>
     <div class="footer-links">
-      <a href="https://github.com/coanalabs/openclay">GitHub</a>
+      <a href="https://github.com/openclay1/OpenClay">GitHub</a>
       <a href="/docs/openclay_public_whitepaper.md" data-umami-event="whitepaper_read">Whitepaper</a>
-      <a href="https://coanalabs.gumroad.com/l/openclay-pro">Pro</a>
+      <a href="YOUR_GUMROAD_LINK" target="_blank">Support</a>
       <a href="mailto:hello@coanalabs.com">Contact</a>
     </div>
     <div class="footer-copy">© 2026 COANA Labs · Puerto Rico · All local, always</div>
@@ -863,8 +822,8 @@
 
   <!-- Mobile sticky bar -->
   <div class="mobile-sticky">
-    <a href="https://github.com/coanalabs/openclay" class="btn-secondary" data-umami-event="download_free">Download free</a>
-    <a href="https://coanalabs.gumroad.com/l/openclay-pro" class="btn-primary" data-umami-event="cta_pro_click">Get Pro</a>
+    <a href="https://github.com/openclay1/OpenClay" class="btn-secondary" data-umami-event="download_free">Get OpenClay</a>
+    <a href="YOUR_GUMROAD_LINK" target="_blank" class="btn-primary" data-umami-event="support_click">Support the project</a>
   </div>
 
   <script>

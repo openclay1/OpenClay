@@ -88,24 +88,6 @@ _session_id = str(uuid.uuid4())[:8]   # unique ID per server start
 CONV_DIR = BASE_DIR / "projects" / "conversations"
 _last_memories_used: list[str] = []   # snippets used in last _build_system_prompt call
 
-# ── Pro license ──────────────────────────────────────────────────
-PRO_ACTIVE = False
-_OPENCLAY_DIR = Path.home() / ".openclay"
-_LICENSE_FILE = _OPENCLAY_DIR / "license.json"
-
-def _load_pro_license():
-    global PRO_ACTIVE
-    try:
-        if _LICENSE_FILE.exists():
-            data = json.loads(_LICENSE_FILE.read_text("utf-8"))
-            if data.get("pro") is True:
-                PRO_ACTIVE = True
-    except Exception:
-        pass
-
-# Load on module init
-_load_pro_license()
-
 # ── Permission policy ─────────────────────────────────────────────
 def requires_confirmation(operation_type: str) -> bool:
     """Return True only for operations that are outbound or irreversible.
@@ -116,7 +98,6 @@ def requires_confirmation(operation_type: str) -> bool:
     _NEEDS_CONFIRM = {
         "network_outbound",    # any request leaving localhost
         "delete_permanent",    # file deletion without checkpoint
-        "license_write",       # ~/.openclay/license.json or .env
         "git_push",            # pushing to remote
         "git_force",           # force-push / reset --hard
     }
@@ -2000,9 +1981,6 @@ class ClayHandler(http.server.SimpleHTTPRequestHandler):
             "/api/tasks": self._handle_tasks_list,
             "/api/tasks/stop": self._handle_task_stop,
             "/api/tasks/demo": self._handle_demo_tasks,
-            # Pro
-            "/api/pro/waitlist": self._handle_pro_waitlist,
-            "/api/activate-pro": self._handle_activate_pro,
             # Projects
             "/api/projects/save": self._handle_project_save,
             "/api/projects/list": self._handle_project_list,
@@ -2104,10 +2082,6 @@ class ClayHandler(http.server.SimpleHTTPRequestHandler):
             else:
                 self._send_json({"error": "not found"}, 404)
             return
-        # Pro status
-        if self.path == "/api/pro-status":
-            self._handle_pro_status()
-            return
         # Public whitepaper
         if self.path == "/docs/openclay_public_whitepaper.md":
             wp = BASE_DIR / "docs" / "openclay_public_whitepaper.md"
@@ -2122,7 +2096,7 @@ class ClayHandler(http.server.SimpleHTTPRequestHandler):
             else:
                 self.send_error(404)
             return
-        # Clay Code Pro routes
+        # Clay Code routes
         if self.path == "/claycode":
             self._handle_claycode_page()
             return
@@ -2654,7 +2628,7 @@ class ClayHandler(http.server.SimpleHTTPRequestHandler):
              "icon": "\U0001f4cb"}
         ]})
 
-    # ── Clay Code Pro handlers ──────────────────────────────────
+    # ── Clay Code handlers ──────────────────────────────────────
     def _handle_claycode_page(self):
         from pro.license import is_pro, gate_html
         if not is_pro():
@@ -2824,16 +2798,6 @@ class ClayHandler(http.server.SimpleHTTPRequestHandler):
         except Exception as e:
             self._send_json({"error": str(e)}, 500)
 
-    def _handle_pro_waitlist(self):
-        try:
-            body = json.loads(self._read_body())
-            email = body.get("email", "")
-            from pro.license import add_to_waitlist
-            ok = add_to_waitlist(email)
-            self._send_json({"ok": ok})
-        except Exception:
-            self._send_json({"ok": False})
-
     # ── TTS: GET /api/tts?text=...&voice=... ─────────────────────
     def _handle_tts_get(self):
         try:
@@ -2936,60 +2900,6 @@ class ClayHandler(http.server.SimpleHTTPRequestHandler):
             "img-src 'self' data:;"
         )
 
-    def _handle_activate_pro(self):
-        try:
-            body = json.loads(self._read_body())
-            key = str(body.get("license_key", "")).strip()[:100]
-            if not key:
-                self._send_json({"success": False, "error": "No license key provided"}); return
-            # Validate via Lemon Squeezy
-            api_key = os.environ.get("LEMON_SQUEEZY_API_KEY", "")
-            store_id = os.environ.get("LEMON_SQUEEZY_STORE_ID", "openclay")
-            if api_key:
-                try:
-                    import urllib.request as ur
-                    req = ur.Request(
-                        "https://api.lemonsqueezy.com/v1/licenses/validate",
-                        data=json.dumps({"license_key": key, "instance_name": store_id}).encode(),
-                        headers={"Content-Type": "application/json", "Accept": "application/json",
-                                 "Authorization": f"Bearer {api_key}"},
-                    )
-                    resp = json.loads(ur.urlopen(req, timeout=10).read())
-                    if not resp.get("activated") and not resp.get("valid"):
-                        self._send_json({"success": False, "error": "Invalid license key"}); return
-                    email = resp.get("meta", {}).get("customer_email", "")
-                except Exception as e:
-                    # If validation fails (network, etc.) in dev mode, allow key starting with "dev-"
-                    if not key.startswith("dev-"):
-                        self._send_json({"success": False, "error": f"Validation error: {e}"}); return
-                    email = "dev@openclay.local"
-            else:
-                # No API key configured — allow dev keys for local dev
-                if not key.startswith("dev-"):
-                    self._send_json({"success": False, "error": "LEMON_SQUEEZY_API_KEY not configured"}); return
-                email = "dev@openclay.local"
-            # Save license
-            global PRO_ACTIVE
-            _OPENCLAY_DIR.mkdir(exist_ok=True)
-            _LICENSE_FILE.write_text(json.dumps({
-                "pro": True, "key": key,
-                "activated_at": datetime.now().isoformat(),
-                "email": email
-            }, indent=2), "utf-8")
-            PRO_ACTIVE = True
-            self._send_json({"success": True, "email": email})
-        except Exception as e:
-            self._send_json({"success": False, "error": str(e)})
-
-    def _handle_pro_status(self):
-        try:
-            data = {}
-            if _LICENSE_FILE.exists():
-                data = json.loads(_LICENSE_FILE.read_text("utf-8"))
-            self._send_json({"pro": PRO_ACTIVE, "email": data.get("email",""), "activated_at": data.get("activated_at","")})
-        except Exception:
-            self._send_json({"pro": False})
-
     def do_OPTIONS(self):
         self.send_response(200)
         self.send_header("Access-Control-Allow-Origin", "*")
@@ -3062,13 +2972,6 @@ def main():
     print(f"  TTS engine: {hw.get('tts_engine','browser')}")
     # Check for better models (logs recommendations, no auto-install)
     _check_for_better_models()
-    # Auto-create pro/license.key so Clay Code always works locally
-    _pro_dir = BASE_DIR / "pro"
-    _license_key = _pro_dir / "license.key"
-    if not _license_key.exists():
-        _pro_dir.mkdir(exist_ok=True)
-        _license_key.write_text("dev-key", "utf-8")
-        print("  Pro license: dev-key created")
     # Model health check on startup + every 30 min
     _model_health_check()
     _start_model_health_thread()
