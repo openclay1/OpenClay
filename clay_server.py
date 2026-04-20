@@ -106,6 +106,22 @@ def _load_pro_license():
 # Load on module init
 _load_pro_license()
 
+# ── Permission policy ─────────────────────────────────────────────
+def requires_confirmation(operation_type: str) -> bool:
+    """Return True only for operations that are outbound or irreversible.
+
+    Default posture: if it stays on the machine, just do it.
+    Only gate operations where something real is at stake.
+    """
+    _NEEDS_CONFIRM = {
+        "network_outbound",    # any request leaving localhost
+        "delete_permanent",    # file deletion without checkpoint
+        "license_write",       # ~/.openclay/license.json or .env
+        "git_push",            # pushing to remote
+        "git_force",           # force-push / reset --hard
+    }
+    return operation_type in _NEEDS_CONFIRM
+
 # ── Hardware Detection ───────────────────────────────────────────
 def _detect_hardware():
     """Detect CPU cores, RAM, GPU availability. Writes hardware_profile.json."""
