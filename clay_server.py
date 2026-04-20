@@ -261,6 +261,25 @@ def _ensure_ollama(max_wait: int = 10) -> bool:
     print("  [engine] recovery timed out after %ds" % max_wait)
     return False
 
+def ensure_ollama_running():
+    """Start Ollama if not already running. Called once at server startup."""
+    try:
+        result = subprocess.run(["ollama", "list"], capture_output=True, timeout=3)
+        if result.returncode == 0:
+            print("  [OLLAMA] Already running.")
+            return
+    except Exception:
+        pass
+    print("  [OLLAMA] Starting Ollama in background…")
+    subprocess.Popen(
+        ["ollama", "serve"],
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+        start_new_session=True,
+    )
+    time.sleep(3)
+    print("  [OLLAMA] Ollama started.")
+
 def _detect_model():
     global _model
     if _model: return _model
@@ -3030,24 +3049,8 @@ def main():
     for d in [WIKI_DIR / "regulations", WIKI_DIR / "papers", WIKI_DIR / "cases",
               MEMORY_DIR, WATCHERS_DIR, AGENTS_DIR, LOGS_DIR, SANDBOX_DIR, MEMORY_STORE_DIR, TASKS_DIR, PROJECTS_DIR]:
         d.mkdir(parents=True, exist_ok=True)
-    # Start Ollama in background — server starts immediately, Ollama catches up
-    def _bg_ollama_start():
-        try:
-            if not _is_ollama_running():
-                subprocess.Popen(["ollama", "serve"], stdout=subprocess.DEVNULL,
-                                  stderr=subprocess.DEVNULL, start_new_session=True)
-            time.sleep(3)  # give Ollama time to bind its port
-            if _is_ollama_running():
-                m = _detect_model()
-                print(f"  [engine] ready  (model: {m})")
-            else:
-                print("  [engine] Ollama not responding — install from https://ollama.com")
-        except FileNotFoundError:
-            print("  [engine] Ollama binary not found — install from https://ollama.com")
-        except Exception as e:
-            print(f"  [engine] startup error: {e}")
-    threading.Thread(target=_bg_ollama_start, daemon=True, name="ollama-start").start()
-    print("  Engine: starting in background…")
+    # Ensure Ollama is running before the server opens for requests
+    ensure_ollama_running()
     # Load soul
     soul = _load_soul()
     if soul:
