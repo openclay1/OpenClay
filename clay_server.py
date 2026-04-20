@@ -2448,6 +2448,7 @@ class ClayHandler(http.server.SimpleHTTPRequestHandler):
             agent_list.append({
                 "name": name,
                 "description": cfg.get("description", ""),
+                "personality_hint": cfg.get("personality_hint", ""),
                 "color_accent": cfg.get("color_accent", "#e06438"),
                 "active": _current_agent and _current_agent.get("name") == name,
                 "workflows": len(cfg.get("workflows", [])),
@@ -2469,36 +2470,43 @@ class ClayHandler(http.server.SimpleHTTPRequestHandler):
         })
 
     def _handle_orchestrate(self):
+        global _current_agent
         body = json.loads(self._read_body())
-        goal = body.get("goal", "")
+        goal = str(body.get("goal", ""))[:2000]
         agent_names = body.get("agents", [])
         if not goal or not agent_names:
             self._send_json({"error": "missing goal or agents"}, 400); return
-        # Security: only allow known agent names
         agent_names = [n for n in agent_names if n in _agents]
         if not agent_names:
             self._send_json({"error": "No valid agents specified"}); return
         results = []
         prev_output = ""
-        for name in agent_names:
-            agent = _agents.get(name)
-            if not agent: continue
-            sys_prompt = agent.get("system_prompt", "")
-            if prev_output:
-                sys_prompt += f"\n\nPrevious agent output:\n{prev_output}"
-            try:
-                req = urllib.request.Request(
-                    f"{OLLAMA_URL}/api/generate",
-                    data=json.dumps({"model": _get_best_model(), "prompt": goal,
-                        "system": sys_prompt, "stream": False}).encode(),
-                    headers={"Content-Type": "application/json"})
-                resp = urllib.request.urlopen(req, timeout=60)
-                result_text = json.loads(resp.read()).get("response", "")
-            except Exception as e:
-                result_text = f"[Error: {e}]"
-            prev_output = result_text
-            results.append({"agent": name, "color": agent.get("color_accent", "#e06438"), "output": result_text})
-        # Save to disk
+        saved_agent = _current_agent
+        try:
+            for name in agent_names:
+                agent = _agents.get(name)
+                if not agent:
+                    continue
+                # Temporarily set active agent so _build_system_prompt injects memories
+                _current_agent = agent
+                sys_prompt = _build_system_prompt(goal)
+                if prev_output:
+                    sys_prompt += f"\n\nPrevious agent output:\n{prev_output}"
+                try:
+                    req = urllib.request.Request(
+                        f"{OLLAMA_URL}/api/generate",
+                        data=json.dumps({"model": _get_best_model(), "prompt": goal,
+                            "system": sys_prompt, "stream": False}).encode(),
+                        headers={"Content-Type": "application/json"})
+                    resp = urllib.request.urlopen(req, timeout=90)
+                    result_text = json.loads(resp.read()).get("response", "")
+                except Exception as e:
+                    result_text = f"[Error: {e}]"
+                prev_output = result_text
+                results.append({"agent": name, "color": agent.get("color_accent", "#e06438"), "output": result_text})
+        finally:
+            _current_agent = saved_agent
+        # Persist to disk
         ORCH_DIR = BASE_DIR / "projects" / "orchestrations"
         ORCH_DIR.mkdir(parents=True, exist_ok=True)
         ts = datetime.now().strftime("%Y%m%d-%H%M%S")

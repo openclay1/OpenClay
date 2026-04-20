@@ -44,15 +44,15 @@
     .btn-icon { background: var(--surface); border: 1px solid var(--border); border-radius: 50%;
       width: 34px; height: 34px; display: flex; align-items: center; justify-content: center;
       cursor: pointer; font-size: 14px; transition: all var(--transition); flex-shrink: 0; }
-    .btn-icon:hover { border-color: var(--agent-color); background: var(--accent-soft); }
+    .btn-icon:hover { border-color: var(--agent-color); background: var(--accent-soft); box-shadow: 0 0 12px rgba(218,113,1,0.4); }
     .btn-icon.active { background: var(--agent-color); border-color: var(--agent-color); }
     .btn-icon.recording { background: #c0392b; border-color: #c0392b; animation: pulse-rec 1.2s infinite; }
     @keyframes pulse-rec { 0%,100% { box-shadow: 0 0 0 0 rgba(192,57,43,0.4); } 50% { box-shadow: 0 0 0 8px rgba(192,57,43,0); } }
     #clay-send { background: var(--agent-color); color: #fff; border: none; border-radius: var(--radius-full);
       padding: 10px 14px; font-family: inherit; font-size: 12px; font-weight: 500;
-      cursor: pointer; transition: all var(--transition); box-shadow: 0 2px 8px rgba(224,100,56,0.3);
+      cursor: pointer; transition: all 0.3s cubic-bezier(0.25,0.46,0.45,0.94); box-shadow: 0 2px 8px rgba(224,100,56,0.3);
       white-space: nowrap; flex-shrink: 0; }
-    #clay-send:hover { filter: brightness(0.9); transform: translateY(-1px); }
+    #clay-send:hover { filter: brightness(0.9); transform: translateY(-1px); box-shadow: 0 0 12px rgba(218,113,1,0.5); }
     #badges { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; margin-top: 6px; min-height: 20px; }
     .badge { font-size: 0.68rem; color: var(--muted); background: var(--surface);
       border: 1px solid var(--border); border-radius: var(--radius-full); padding: 3px 10px;
@@ -69,7 +69,7 @@
     /* Status bar */
     #status-bar { position: fixed; bottom: 80px; left: 50%; transform: translateX(-50%);
       z-index: 10; text-align: center; pointer-events: none; width: 90vw; }
-    #status-bar p { font-size: 0.6rem; color: var(--faint); letter-spacing: 0.04em; line-height: 1.5; }
+    #status-bar p { font-size: 0.6rem; color: var(--faint); letter-spacing: 0.04em; line-height: 1.5; font-family: 'Courier New', monospace; }
     #status-bar button { pointer-events: auto; }
     #memory-status {
       background: none; border: 1px solid transparent; border-radius: 9999px;
@@ -95,11 +95,11 @@
     }
     #memory-pill:hover { border-color: rgba(218,113,1,0.5); color: rgba(218,113,1,1); }
     @keyframes pill-fade-in { from { opacity: 0; transform: translateX(-50%) translateY(4px); } to { opacity: 1; transform: translateX(-50%) translateY(0); } }
-    /* Agent cards — explicit block layout, no overlap */
+    /* Agent cards — solar punk: carved not printed */
     .agent-card { display: block; width: 100%; margin-bottom: 8px; padding: 12px;
-      border: 1px solid var(--border); border-radius: 8px; cursor: pointer;
-      background: var(--surface); transition: all var(--transition); text-align: left; }
-    .agent-card:hover { border-color: var(--agent-color) !important; background: var(--accent-soft); }
+      border: 1px solid var(--border); border-radius: 12px 4px 12px 4px; cursor: pointer;
+      background: var(--surface); transition: all 0.3s cubic-bezier(0.25,0.46,0.45,0.94); text-align: left; }
+    .agent-card:hover { border-color: var(--agent-color) !important; background: var(--accent-soft); box-shadow: 0 0 12px rgba(218,113,1,0.25); }
     .agent-card.active { border-color: var(--agent-color) !important; background: var(--primary-highlight); }
     /* Top-right nav group */
     #top-right-nav { position: fixed; top: 16px; right: 16px; z-index: 20;
@@ -133,7 +133,9 @@
     #mic-btn.recording #mic-dot { display: block; animation: pulse-rec 1.2s infinite; }
     #settings-panel { position: fixed; top: 0; right: -400px; width: 380px; height: 100%;
       background: var(--surface); border-left: 1px solid var(--border); z-index: 30;
-      transition: right 250ms cubic-bezier(0.16,1,0.3,1); overflow-y: auto; }
+      transition: right 300ms cubic-bezier(0.25,0.46,0.45,0.94); overflow-y: auto;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='300' height='300' filter='url(%23n)' opacity='0.035'/%3E%3C/svg%3E");
+    }
     #settings-panel.open { right: 0; }
     .settings-inner { padding: 20px; }
     #settings-panel h2 { font-family: 'Instrument Serif',Georgia,serif; font-style: italic;
@@ -279,9 +281,11 @@
     #disclaimer.visible { display: block; }
     /* General */
     .settings-action { width: 100%; padding: 8px 16px; border-radius: var(--radius-full);
-      font-family: inherit; font-size: 0.82rem; cursor: pointer; transition: all var(--transition); }
+      font-family: inherit; font-size: 0.82rem; cursor: pointer; transition: all 0.3s cubic-bezier(0.25,0.46,0.45,0.94); }
     .settings-action.primary { background: var(--agent-color); color: #fff; border: none; }
+    .settings-action.primary:hover { filter: brightness(1.1); box-shadow: 0 0 14px rgba(218,113,1,0.45); transform: translateY(-1px); }
     .settings-action.secondary { background: none; color: var(--muted); border: 1px solid var(--border); }
+    .settings-action.secondary:hover { border-color: var(--agent-color); color: var(--text); box-shadow: 0 0 10px rgba(218,113,1,0.2); }
     #settings-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%;
       background: rgba(0,0,0,0.4); z-index: 25; opacity: 0; pointer-events: none; transition: opacity 250ms; }
     #settings-overlay.visible { opacity: 1; pointer-events: auto; }
@@ -723,7 +727,7 @@
         <h3>Agentes</h3>
         <div id="agent-roster" style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;"></div>
         <h3 style="margin-top:16px;">Multi-Agent Task</h3>
-        <textarea id="orch-goal" placeholder="Describe what you want done..." style="width:100%;min-height:64px;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius-md);padding:8px 10px;font-family:inherit;font-size:0.75rem;color:var(--text);outline:none;resize:vertical;margin-bottom:6px;"></textarea>
+        <textarea id="orch-goal" placeholder="Analyze my latest project and suggest improvements" style="width:100%;min-height:64px;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius-md);padding:8px 10px;font-family:inherit;font-size:0.75rem;color:var(--text);outline:none;resize:vertical;margin-bottom:6px;"></textarea>
         <div id="orch-agent-checks" style="display:flex;flex-wrap:wrap;gap:6px;margin:8px 0;"></div>
         <button onclick="runOrchestration()" class="settings-action primary" style="width:100%;">&#9654; Run Chain</button>
         <div id="orch-progress" style="display:none;margin-top:10px;font-size:0.72rem;color:var(--muted);border:1px solid var(--border);border-radius:var(--radius-md);padding:8px 10px;max-height:200px;overflow-y:auto;"></div>
@@ -1248,7 +1252,8 @@
             '<div class="ac-desc" style="font-size:12px;color:var(--muted);margin-top:3px;">' +
               escapeHtml(a.description || '') +
               (a.workflows ? ' · ' + a.workflows + ' workflows' : '') +
-            '</div>';
+            '</div>' +
+            (a.personality_hint ? '<div style="font-size:11px;color:var(--faint);font-style:italic;margin-top:4px;">' + escapeHtml(a.personality_hint) + '</div>' : '');
           card.addEventListener('click', function(){
             console.log('agent selected:', a.name);
             selectAgent(a.name);
@@ -1594,9 +1599,25 @@
 
     // ═══ Orchestration ═══
     let _orchSelectedAgents=new Set();
+    const _ORCH_PLACEHOLDERS = [
+      'Analyze my latest project and suggest improvements',
+      'Research this topic and write a summary I can send',
+      'Review my code and explain it in plain language'
+    ];
+    let _orchPlaceholderIdx = 0, _orchPlaceholderTimer = null;
+    function _startOrchPlaceholderCycle() {
+      const ta = document.getElementById('orch-goal');
+      if (!ta) return;
+      clearInterval(_orchPlaceholderTimer);
+      _orchPlaceholderTimer = setInterval(() => {
+        _orchPlaceholderIdx = (_orchPlaceholderIdx + 1) % _ORCH_PLACEHOLDERS.length;
+        ta.placeholder = _ORCH_PLACEHOLDERS[_orchPlaceholderIdx];
+      }, 4000);
+    }
     async function loadOrchestration(){
       await renderAgentRoster();
       await loadOrchRecentTasks();
+      _startOrchPlaceholderCycle();
     }
     async function renderAgentRoster(){
       const roster=document.getElementById('agent-roster');
@@ -1611,8 +1632,8 @@
         agents.forEach(a=>{
           const isActive=a.active;
           const card=document.createElement('div');
-          card.style.cssText='background:var(--surface);border:1px solid '+(isActive?a.color_accent:'var(--border)')+';border-radius:var(--radius-lg);padding:8px 10px;cursor:pointer;transition:all 0.18s;'+(isActive?'box-shadow:0 0 8px '+a.color_accent+'44;':'');
-          card.innerHTML='<div style="display:flex;align-items:center;gap:5px;margin-bottom:4px;"><span style="width:7px;height:7px;border-radius:50%;background:'+a.color_accent+';flex-shrink:0;"></span><span style="font-size:0.75rem;font-weight:600;color:var(--text);">'+escapeHtml(a.name)+'</span>'+(isActive?'<span style="font-size:0.55rem;background:'+a.color_accent+'22;color:'+a.color_accent+';border-radius:9999px;padding:1px 5px;margin-left:auto;">Active</span>':'')+'</div><div style="font-size:0.65rem;color:var(--muted);">'+escapeHtml(a.description||'')+'</div><button style="margin-top:6px;font-size:0.65rem;padding:2px 8px;background:var(--primary);color:#fff;border:none;border-radius:9999px;cursor:pointer;" onclick="selectAgent(\''+a.name+'\')">&#9654; Activate</button>';
+          card.style.cssText='background:var(--surface);border:1px solid '+(isActive?a.color_accent:'var(--border)')+';border-radius:12px 4px 12px 4px;padding:8px 10px;cursor:pointer;transition:all 0.3s cubic-bezier(0.25,0.46,0.45,0.94);'+(isActive?'box-shadow:0 0 12px '+a.color_accent+'55;':'');
+          card.innerHTML='<div style="display:flex;align-items:center;gap:5px;margin-bottom:4px;"><span style="width:7px;height:7px;border-radius:50%;background:'+a.color_accent+';flex-shrink:0;'+(isActive?'box-shadow:0 0 6px '+a.color_accent+';':'')+'"></span><span style="font-size:0.75rem;font-weight:600;color:var(--text);">'+escapeHtml(a.name)+'</span>'+(isActive?'<span style="font-size:0.55rem;background:'+a.color_accent+'22;color:'+a.color_accent+';border-radius:9999px;padding:1px 5px;margin-left:auto;">Active</span>':'')+'</div><div style="font-size:0.65rem;color:var(--muted);">'+escapeHtml(a.description||'')+'</div>'+(a.personality_hint?'<div style="font-size:0.6rem;color:var(--faint);font-style:italic;margin-top:3px;">'+escapeHtml(a.personality_hint)+'</div>':'')+'<button style="margin-top:6px;font-size:0.65rem;padding:2px 8px;background:var(--primary);color:#fff;border:none;border-radius:9999px;cursor:pointer;" onclick="event.stopPropagation();selectAgent(\''+a.name+'\')">&#9654; Activate</button>';
           roster.appendChild(card);
           // Checkbox for chain
           const lbl=document.createElement('label');
@@ -1630,16 +1651,23 @@
       const agents=[..._orchSelectedAgents];
       if(!agents.length){showBadge('orch','Select at least one agent',true);setTimeout(()=>removeBadge('orch'),2000);return;}
       const prog=document.getElementById('orch-progress');
-      prog.style.display='block';prog.innerHTML='<span style="color:var(--muted);">Running chain...</span>';
+      prog.style.display='block';
+      prog.innerHTML='<div style="display:flex;align-items:center;gap:8px;color:var(--muted);font-size:0.72rem;"><span class="tp-dot" style="animation:tp-pulse 1s infinite;"></span>Running chain…</div>';
       try{
         const r=await fetch('/api/orchestrate',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({goal,agents})});
         const d=await r.json();
         if(d.error){prog.innerHTML='<span style="color:#c0392b;">'+escapeHtml(d.error)+'</span>';return;}
-        prog.innerHTML='';
+        // Mission debrief layout
+        prog.innerHTML='<div style="font-size:0.6rem;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:var(--faint);margin-bottom:10px;">— MISSION DEBRIEF —</div>';
         (d.results||[]).forEach(res=>{
           const div=document.createElement('div');
-          div.style.cssText='margin-bottom:10px;border-left:3px solid '+res.color+';padding-left:8px;';
-          div.innerHTML='<div style="font-size:0.68rem;font-weight:600;color:'+res.color+';">'+escapeHtml(res.agent)+'</div><div style="font-size:0.72rem;color:var(--text);margin-top:3px;white-space:pre-wrap;">'+escapeHtml(res.output)+'</div>';
+          div.style.cssText='margin-bottom:14px;border-left:2px solid '+res.color+';padding:6px 10px;background:'+res.color+'0a;border-radius:0 6px 6px 0;';
+          div.innerHTML=
+            '<div style="display:flex;align-items:center;gap:5px;margin-bottom:5px;">' +
+              '<span style="width:6px;height:6px;border-radius:50%;background:'+res.color+';flex-shrink:0;"></span>' +
+              '<span style="font-size:0.68rem;font-weight:700;color:'+res.color+';letter-spacing:0.04em;">'+escapeHtml(res.agent).toUpperCase()+'</span>' +
+            '</div>' +
+            '<div style="font-size:0.72rem;color:var(--text);line-height:1.55;white-space:pre-wrap;">'+escapeHtml(res.output)+'</div>';
           prog.appendChild(div);
         });
         loadOrchRecentTasks();
