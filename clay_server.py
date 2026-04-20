@@ -2028,6 +2028,18 @@ class ClayHandler(http.server.SimpleHTTPRequestHandler):
             else:
                 self._send_json({"error": "not found"}, 404)
             return
+        # Ollama status
+        if self.path == "/api/ollama-status":
+            running = _is_ollama_running()
+            models = []
+            if running:
+                try:
+                    resp = urllib.request.urlopen(f"{OLLAMA_URL}/api/tags", timeout=3)
+                    models = [m["name"] for m in json.loads(resp.read()).get("models", [])]
+                except Exception:
+                    pass
+            self._send_json({"running": running, "models": models, "active_model": _model or ""})
+            return
         # Hardware profile
         if self.path == "/api/hardware":
             try:
@@ -3009,12 +3021,24 @@ def main():
     for d in [WIKI_DIR / "regulations", WIKI_DIR / "papers", WIKI_DIR / "cases",
               MEMORY_DIR, WATCHERS_DIR, AGENTS_DIR, LOGS_DIR, SANDBOX_DIR, MEMORY_STORE_DIR, TASKS_DIR, PROJECTS_DIR]:
         d.mkdir(parents=True, exist_ok=True)
-    # Start Ollama
-    print("  Starting engine...", end=" ", flush=True)
-    if _start_ollama():
-        print(f"ok  (model: {_detect_model()})")
-    else:
-        print("x  Ollama not available"); sys.exit(1)
+    # Start Ollama in background — server starts immediately, Ollama catches up
+    def _bg_ollama_start():
+        try:
+            if not _is_ollama_running():
+                subprocess.Popen(["ollama", "serve"], stdout=subprocess.DEVNULL,
+                                  stderr=subprocess.DEVNULL, start_new_session=True)
+            time.sleep(3)  # give Ollama time to bind its port
+            if _is_ollama_running():
+                m = _detect_model()
+                print(f"  [engine] ready  (model: {m})")
+            else:
+                print("  [engine] Ollama not responding — install from https://ollama.com")
+        except FileNotFoundError:
+            print("  [engine] Ollama binary not found — install from https://ollama.com")
+        except Exception as e:
+            print(f"  [engine] startup error: {e}")
+    threading.Thread(target=_bg_ollama_start, daemon=True, name="ollama-start").start()
+    print("  Engine: starting in background…")
     # Load soul
     soul = _load_soul()
     if soul:

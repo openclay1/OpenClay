@@ -27,12 +27,12 @@
     #title h1 { font-family: 'Instrument Serif',Georgia,serif; font-style: italic;
       font-size: 2rem; font-weight: 400; color: var(--agent-color); line-height: 1.15;
       text-shadow: 0 2px 20px rgba(224,100,56,0.2); transition: color 600ms; }
-    @keyframes subtitle-fade { 0%,80%{opacity:1} 100%{opacity:0} }
+    @keyframes slogan-anim { 0%{opacity:0} 15%{opacity:1} 77%{opacity:1} 100%{opacity:0} }
     #title p { font-size: 0.7rem; color: var(--faint); margin-top: 2px; letter-spacing: 0.05em;
-      animation: subtitle-fade 5s forwards; will-change: opacity; }
-    #last-query { position: fixed; top: 72px; left: 0; right: 0; text-align: center;
-      font-size: 0.72rem; color: var(--faint); z-index: 10; pointer-events: none;
-      margin-top: 8px; opacity: 0; transition: opacity 0.5s; }
+      animation: slogan-anim 6.5s forwards; will-change: opacity; pointer-events: none; }
+    #last-query { position: fixed; top: 64px; left: 0; right: 0; text-align: center;
+      font-size: 0.68rem; color: var(--faint); z-index: 10; pointer-events: none;
+      letter-spacing: 0.03em; opacity: 0; transition: opacity 0.5s; }
     #controls { position: fixed; bottom: 14px; left: 50%; transform: translateX(-50%);
       z-index: 10; width: calc(100vw - 24px); max-width: 560px; }
     #input-row { display: flex; gap: 4px; align-items: center; }
@@ -325,6 +325,16 @@
       padding: 2px 8px; border: 1px solid rgba(224,100,56,0.3); border-radius: var(--radius-full);
       background: rgba(224,100,56,0.06); transition: all var(--transition); }
     .output-link:hover { background: rgba(224,100,56,0.12); border-color: var(--agent-color); }
+    /* Engine startup banner */
+    #engine-banner { position: fixed; bottom: 86px; left: 50%; transform: translateX(-50%);
+      z-index: 12; background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius-full); padding: 6px 14px; font-size: 0.68rem;
+      color: var(--muted); display: none; align-items: center; gap: 8px;
+      box-shadow: var(--shadow-sm); white-space: nowrap; pointer-events: none; }
+    #engine-banner.visible { display: flex; }
+    #engine-banner .eb-dot { width: 6px; height: 6px; border-radius: 50%;
+      background: var(--agent-color); animation: tp-pulse 1.2s ease-in-out infinite; flex-shrink: 0; }
+    #engine-banner.ready { color: var(--text); border-color: var(--color-primary,var(--primary)); }
     /* Footer */
     #openclay-footer { position: fixed; bottom: 0; left: 0; right: 0; z-index: 4;
       text-align: center; padding: 4px 0 5px;
@@ -513,7 +523,7 @@
   </style>
 </head>
 <body>
-  <div id="title"><h1>OpenClay <span id="pro-badge" style="display:none;font-family:'Satoshi',sans-serif;font-style:normal;font-size:0.55rem;font-weight:700;background:rgba(1,105,111,0.15);color:#01696f;border:1px solid rgba(1,105,111,0.3);border-radius:9999px;padding:2px 7px;vertical-align:middle;letter-spacing:0.05em;">PRO</span></h1><p>COANA LABS &middot; LOCAL &middot; PRIVADO &middot; TUYO</p></div>
+  <div id="title"><h1>OpenClay <span id="pro-badge" style="display:none;font-family:'Satoshi',sans-serif;font-style:normal;font-size:0.55rem;font-weight:700;background:rgba(1,105,111,0.15);color:#01696f;border:1px solid rgba(1,105,111,0.3);border-radius:9999px;padding:2px 7px;vertical-align:middle;letter-spacing:0.05em;">PRO</span></h1><p id="slogan">Your AI. Your machine. Your rules.</p></div>
   <div id="last-query"></div>
   <button id="demo-mode-btn" onclick="toggleDemoMode()" title="Demo Mode — smooth animations for screen recording">&#127916; Demo</button>
   <div id="rec-indicator"><span class="rec-dot"></span>REC</div>
@@ -748,6 +758,7 @@
     <p id="privacy-text">100% local &middot; nada sale de tu computadora</p>
     <button id="memory-status" onclick="cycleAgent()" title="Click to switch agent"></button>
   </div>
+  <div id="engine-banner"><span class="eb-dot"></span><span id="engine-banner-text">Starting local model…</span></div>
   <div id="task-progress">
     <span class="tp-dot"></span>
     <span class="tp-step" id="tp-step">Paso 1</span>
@@ -1144,6 +1155,7 @@
       document.querySelectorAll('.tab-content').forEach(t=>t.classList.remove('active'));
       document.querySelector(`[onclick="switchTab('${name}')"]`).classList.add('active');
       document.getElementById('tab-'+name).classList.add('active');
+      if (name === 'agents') loadAgents();
       if (name === 'models') loadModels();
       if (name === 'voice') _loadVoices();
       if (name === 'memory') loadMemories();
@@ -1225,6 +1237,7 @@
     async function loadAgents(){
       const el = document.getElementById('agents-list');
       if (!el) return;
+      el.innerHTML = '<div style="font-size:0.72rem;color:var(--faint);padding:8px 0">Cargando agentes…</div>';
       try{
         const r = await fetch('/api/agents', {method:'POST', headers:{'Content-Type':'application/json'}, body:'{}'});
         if (!r.ok) throw new Error('HTTP ' + r.status);
@@ -1927,7 +1940,7 @@
     const TRANSLATIONS = {
       es: {
         title: 'OpenClay',
-        subtitle: 'COANA LABS · LOCAL · PRIVADO · TUYO',
+        subtitle: 'Your AI. Your machine. Your rules.',
         placeholder: 'Pregunta algo... / Ask anything...',
         taskPlaceholder: 'Describe la tarea...',
         hint: 'todo es local  /  everything is local',
@@ -1976,7 +1989,7 @@
       },
       en: {
         title: 'OpenClay',
-        subtitle: 'COANA LABS · LOCAL · PRIVATE · YOURS',
+        subtitle: 'Your AI. Your machine. Your rules.',
         placeholder: 'Ask anything...',
         taskPlaceholder: 'Describe the task...',
         hint: 'everything is local  /  todo es local',
@@ -2025,7 +2038,7 @@
       },
       fr: {
         title: 'OpenClay',
-        subtitle: 'COANA LABS · LOCAL · PRIVÉ · À TOI',
+        subtitle: 'Your AI. Your machine. Your rules.',
         placeholder: 'Pose une question...',
         taskPlaceholder: 'Décris la tâche...',
         hint: 'tout est local  /  everything is local',
@@ -2074,7 +2087,7 @@
       },
       pt: {
         title: 'OpenClay',
-        subtitle: 'COANA LABS · LOCAL · PRIVADO · SEU',
+        subtitle: 'Your AI. Your machine. Your rules.',
         placeholder: 'Pergunte algo...',
         taskPlaceholder: 'Descreva a tarefa...',
         hint: 'tudo é local  /  everything is local',
@@ -2491,6 +2504,37 @@
     setTimeout(checkContinueBanner, 2000);
 
     function escapeHtml(t){const d=document.createElement('div');d.textContent=t;return d.innerHTML;}
+
+    // ═══ Ollama engine status polling ═══
+    (function(){
+      const banner = document.getElementById('engine-banner');
+      const label  = document.getElementById('engine-banner-text');
+      if (!banner) return;
+      let _ready = false;
+      async function checkEngine() {
+        try {
+          const r = await fetch('/api/ollama-status');
+          if (!r.ok) return;
+          const d = await r.json();
+          if (d.running) {
+            if (!_ready) {
+              _ready = true;
+              label.textContent = 'Model ready' + (d.active_model ? ' · ' + d.active_model : '');
+              banner.classList.add('ready');
+              banner.classList.add('visible');
+              setTimeout(() => { banner.classList.remove('visible'); }, 2500);
+            }
+          } else {
+            _ready = false;
+            label.textContent = 'Starting local model…';
+            banner.classList.remove('ready');
+            banner.classList.add('visible');
+          }
+        } catch(e) {}
+      }
+      checkEngine();
+      const _poll = setInterval(() => { if (_ready) { clearInterval(_poll); } else { checkEngine(); } }, 2000);
+    })();
   </script>
 </body>
 </html>

@@ -51,7 +51,7 @@ const MESH_GREEN = [39, 174, 96];
 function setup() {
   let canvas = createCanvas(windowWidth, windowHeight);
   canvas.parent("canvas-container");
-  baseRadius = min(width, height) * 0.18;
+  baseRadius = min(width, height) * 0.16;
   for (let i = 0; i < numPoints; i++) {
     clayPoints.push({
       angle: map(i, 0, numPoints, 0, TWO_PI),
@@ -287,7 +287,7 @@ function draw() {
   breathPhase += 0.015;
 
   if (!animInited) {
-    let fullR = min(width, height) * 0.18;
+    let fullR = min(width, height) * 0.16;
     targetCY = height * 0.35; currentCY = height * 0.35;
     targetRadius = fullR; currentRadius = 0;
     animInited = true;
@@ -302,7 +302,7 @@ function draw() {
     CLAY_BASE[2] = lerp(morphFrom[2], morphTo[2], ease);
   }
 
-  let fullR = min(width, height) * 0.18;
+  let fullR = min(width, height) * 0.16;
   if (state === "speaking" || (state === "thinking" && responseText.length > 0)) {
     targetRadius = fullR * 0.5; targetCY = height * 0.18;
   } else if (state === "thinking") {
@@ -659,5 +659,5 @@ function updateParticles() {
 
 function windowResized() {
   resizeCanvas(windowWidth, windowHeight);
-  baseRadius = min(width, height) * 0.18;
+  baseRadius = min(width, height) * 0.16;
 }
