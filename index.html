@@ -69,7 +69,7 @@
     /* Status bar */
     #status-bar { position: fixed; bottom: 80px; left: 50%; transform: translateX(-50%);
       z-index: 10; text-align: center; pointer-events: none; width: 90vw; }
-    #status-bar p { font-size: 0.6rem; color: var(--faint); letter-spacing: 0.04em; line-height: 1.5; font-family: 'Courier New', monospace; }
+    #status-bar p { font-size: 0.6rem; color: var(--faint); letter-spacing: 0.04em; line-height: 1.5; }
     #status-bar button { pointer-events: auto; }
     #memory-status {
       background: none; border: 1px solid transparent; border-radius: 9999px;
@@ -95,9 +95,9 @@
     }
     #memory-pill:hover { border-color: rgba(218,113,1,0.5); color: rgba(218,113,1,1); }
     @keyframes pill-fade-in { from { opacity: 0; transform: translateX(-50%) translateY(4px); } to { opacity: 1; transform: translateX(-50%) translateY(0); } }
-    /* Agent cards — solar punk: carved not printed */
+    /* Agent cards — explicit block layout, no overlap */
     .agent-card { display: block; width: 100%; margin-bottom: 8px; padding: 12px;
-      border: 1px solid var(--border); border-radius: 12px 4px 12px 4px; cursor: pointer;
+      border: 1px solid var(--border); border-radius: 8px; cursor: pointer;
       background: var(--surface); transition: all 0.3s cubic-bezier(0.25,0.46,0.45,0.94); text-align: left; }
     .agent-card:hover { border-color: var(--agent-color) !important; background: var(--accent-soft); box-shadow: 0 0 12px rgba(218,113,1,0.25); }
     .agent-card.active { border-color: var(--agent-color) !important; background: var(--primary-highlight); }
@@ -133,9 +133,7 @@
     #mic-btn.recording #mic-dot { display: block; animation: pulse-rec 1.2s infinite; }
     #settings-panel { position: fixed; top: 0; right: -400px; width: 380px; height: 100%;
       background: var(--surface); border-left: 1px solid var(--border); z-index: 30;
-      transition: right 300ms cubic-bezier(0.25,0.46,0.45,0.94); overflow-y: auto;
-      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='300' height='300' filter='url(%23n)' opacity='0.035'/%3E%3C/svg%3E");
-    }
+      transition: right 300ms cubic-bezier(0.25,0.46,0.45,0.94); overflow-y: auto; }
     #settings-panel.open { right: 0; }
     .settings-inner { padding: 20px; }
     #settings-panel h2 { font-family: 'Instrument Serif',Georgia,serif; font-style: italic;
@@ -1632,7 +1630,7 @@
         agents.forEach(a=>{
           const isActive=a.active;
           const card=document.createElement('div');
-          card.style.cssText='background:var(--surface);border:1px solid '+(isActive?a.color_accent:'var(--border)')+';border-radius:12px 4px 12px 4px;padding:8px 10px;cursor:pointer;transition:all 0.3s cubic-bezier(0.25,0.46,0.45,0.94);'+(isActive?'box-shadow:0 0 12px '+a.color_accent+'55;':'');
+          card.style.cssText='background:var(--surface);border:1px solid '+(isActive?a.color_accent:'var(--border)')+';border-radius:var(--radius-lg);padding:8px 10px;cursor:pointer;transition:all 0.3s cubic-bezier(0.25,0.46,0.45,0.94);'+(isActive?'box-shadow:0 0 8px '+a.color_accent+'44;':'');
           card.innerHTML='<div style="display:flex;align-items:center;gap:5px;margin-bottom:4px;"><span style="width:7px;height:7px;border-radius:50%;background:'+a.color_accent+';flex-shrink:0;'+(isActive?'box-shadow:0 0 6px '+a.color_accent+';':'')+'"></span><span style="font-size:0.75rem;font-weight:600;color:var(--text);">'+escapeHtml(a.name)+'</span>'+(isActive?'<span style="font-size:0.55rem;background:'+a.color_accent+'22;color:'+a.color_accent+';border-radius:9999px;padding:1px 5px;margin-left:auto;">Active</span>':'')+'</div><div style="font-size:0.65rem;color:var(--muted);">'+escapeHtml(a.description||'')+'</div>'+(a.personality_hint?'<div style="font-size:0.6rem;color:var(--faint);font-style:italic;margin-top:3px;">'+escapeHtml(a.personality_hint)+'</div>':'')+'<button style="margin-top:6px;font-size:0.65rem;padding:2px 8px;background:var(--primary);color:#fff;border:none;border-radius:9999px;cursor:pointer;" onclick="event.stopPropagation();selectAgent(\''+a.name+'\')">&#9654; Activate</button>';
           roster.appendChild(card);
           // Checkbox for chain
