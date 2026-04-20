@@ -102,11 +102,8 @@ function handleSend() {
   canvasStatus = "";
   for (let i = 0; i < 15; i++) particles.push(makeParticle(width/2, currentCY || height*0.35));
 
-  // Track user message in history
+  if (typeof ctAppendUser === 'function') ctAppendUser(text);
   if (typeof addToHistory === 'function') addToHistory('user', text);
-  // Show last query
-  if (typeof _showLastQuery === 'function') _showLastQuery(text);
-
   askOllama(inputText);
 }
 
@@ -148,8 +145,8 @@ function handleSendRaw(text, workflowPrompt) {
   responseText = ""; displayedText = ""; charIndex = 0;
   canvasStatus = "";
   for (let i = 0; i < 15; i++) particles.push(makeParticle(width/2, currentCY || height*0.35));
+  if (typeof ctAppendUser === 'function') ctAppendUser(text);
   if (typeof addToHistory === 'function') addToHistory('user', text);
-  if (typeof _showLastQuery === 'function') _showLastQuery(text);
   askOllama(combined);
 }
 
@@ -196,14 +193,18 @@ function setRecordingState(recording) {
 
 async function askOllama(prompt) {
   const demoThinkStart = Date.now();
-  // Expose abort controller so toggleMute() can cancel streaming
   const _ctrl = new AbortController();
   window._streamAbortController = _ctrl;
+  // Build history payload — everything already in localHistory except the just-added user msg
+  const historyPayload = (typeof localHistory !== 'undefined')
+    ? localHistory.slice(0, -1).map(h => ({ role: h.role, content: h.content }))
+    : [];
+  let _ctHandle = null;
   try {
     const resp = await fetch("/api/ask", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ prompt }),
+      body: JSON.stringify({ prompt, history: historyPayload }),
       signal: _ctrl.signal,
     });
     if (!resp.ok) throw new Error("Server error: " + resp.status);
@@ -217,21 +218,23 @@ async function askOllama(prompt) {
         state = "speaking"; return;
       }
       if (data.response) {
-        // Demo Mode: hold thinking state for at least 2s so blob looks alive on camera
         if (window.demoMode) {
           const elapsed = Date.now() - demoThinkStart;
           if (elapsed < 2000) await new Promise(r => setTimeout(r, 2000 - elapsed));
         }
         responseText = data.response;
         state = "speaking";
+        _ctHandle = (typeof ctStartClay === 'function') ? ctStartClay() : null;
+        if (typeof ctUpdateClay === 'function') ctUpdateClay(_ctHandle, data.response);
+        if (typeof ctFinishClay === 'function') ctFinishClay(_ctHandle);
         if (typeof addToHistory === 'function') addToHistory('assistant', data.response);
         if (typeof speakText === 'function') speakText(responseText);
-        if (typeof _hideLastQuery === 'function') _hideLastQuery();
         return;
       }
     }
 
     // Streaming response
+    _ctHandle = (typeof ctStartClay === 'function') ? ctStartClay() : null;
     const reader = resp.body.getReader();
     const decoder = new TextDecoder();
     let fullText = "";
@@ -252,10 +255,11 @@ async function askOllama(prompt) {
           }
           if (data.response) {
             if (_firstToken) { heartbeatPulse = 1.0; _firstToken = false; }
-            fullText += data.response; responseText = fullText;
+            fullText += data.response;
+            responseText = fullText;
+            if (typeof ctUpdateClay === 'function') ctUpdateClay(_ctHandle, fullText);
           }
           if (data.done) {
-            // Demo Mode: minimum 2s thinking before speaking
             if (window.demoMode) {
               const elapsed = Date.now() - demoThinkStart;
               if (elapsed < 2000) await new Promise(r => setTimeout(r, 2000 - elapsed));
@@ -266,15 +270,16 @@ async function askOllama(prompt) {
       }
     }
     if (state !== "speaking") state = "speaking";
+    if (typeof ctFinishClay === 'function') ctFinishClay(_ctHandle);
     if (typeof addToHistory === 'function') addToHistory('assistant', fullText);
     if (typeof speakText === 'function') speakText(fullText);
-    if (typeof _hideLastQuery === 'function') _hideLastQuery();
   } catch (err) {
     if (err && err.name === 'AbortError') {
-      // User cancelled — stay quiet, just return to idle
+      if (typeof ctFinishClay === 'function') ctFinishClay(_ctHandle);
       if (state === 'thinking') state = 'idle';
       return;
     }
+    if (typeof ctFinishClay === 'function') ctFinishClay(_ctHandle);
     responseText = "No pude conectar con el modelo local.\nVerifica que Ollama este corriendo.";
     state = "speaking";
   } finally {

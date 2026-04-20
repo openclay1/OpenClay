@@ -2186,6 +2186,15 @@ class ClayHandler(http.server.SimpleHTTPRequestHandler):
         # Simple mode — streaming
         system = _build_system_prompt(prompt)
         full_prompt = prompt
+        # Prepend prior conversation turns for multi-turn context
+        prior_turns = body.get("history", [])
+        if prior_turns:
+            ctx_lines = []
+            for turn in prior_turns[-6:]:  # last 3 exchanges
+                role_label = "Usuario" if turn.get("role") == "user" else "Clay"
+                content = (turn.get("content") or "")[:400]
+                ctx_lines.append(f"{role_label}: {content}")
+            full_prompt = "[Conversación anterior]\n" + "\n".join(ctx_lines) + "\n\n" + prompt
         if loaded_document:
             full_prompt = f"[Document: {loaded_filename}]\n\n{loaded_document[:6000]}\n\n---\nUser: {prompt}"
 

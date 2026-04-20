@@ -520,11 +520,46 @@
         font-size: 0.68rem; border-left: 1px solid var(--border);
       }
     }
+    /* ─── Conversation Thread ─── */
+    #conversation-thread {
+      position: fixed; left: 50%; transform: translateX(-50%);
+      width: calc(100vw - 24px); max-width: 640px;
+      bottom: 110px; max-height: calc(100vh - 220px);
+      overflow-y: auto; z-index: 8;
+      display: flex; flex-direction: column; gap: 8px;
+      padding: 8px 0 4px; pointer-events: auto;
+      scrollbar-width: thin; scrollbar-color: var(--border) transparent;
+    }
+    .ct-bubble {
+      max-width: 82%; padding: 10px 14px; border-radius: var(--radius-xl);
+      font-size: 0.81rem; line-height: 1.55; word-wrap: break-word; white-space: pre-wrap;
+      animation: ct-fadein 180ms ease forwards;
+    }
+    @keyframes ct-fadein { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+    .ct-bubble-user {
+      align-self: flex-end; background: rgba(27,24,20,0.9);
+      border: 1px solid var(--border); color: var(--text);
+      backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+    }
+    .ct-bubble-clay {
+      align-self: flex-start; background: rgba(32,29,25,0.9);
+      border: 1px solid var(--border); color: var(--text);
+      backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+    }
+    .ct-agent-label {
+      font-size: 0.6rem; font-weight: 600; margin-bottom: 4px;
+      letter-spacing: 0.04em; text-transform: uppercase;
+    }
+    .ct-cursor {
+      display: inline-block; width: 2px; height: 0.82em;
+      background: var(--agent-color); margin-left: 1px; vertical-align: middle;
+      animation: ct-blink 0.8s step-end infinite;
+    }
+    @keyframes ct-blink { 0%,100%{opacity:1} 50%{opacity:0} }
   </style>
 </head>
 <body>
   <div id="title"><h1>OpenClay <span id="pro-badge" style="display:none;font-family:'Satoshi',sans-serif;font-style:normal;font-size:0.55rem;font-weight:700;background:rgba(1,105,111,0.15);color:#01696f;border:1px solid rgba(1,105,111,0.3);border-radius:9999px;padding:2px 7px;vertical-align:middle;letter-spacing:0.05em;">PRO</span></h1><p id="slogan">Your AI. Your machine. Your rules.</p></div>
-  <div id="last-query"></div>
   <button id="demo-mode-btn" onclick="toggleDemoMode()" title="Demo Mode — smooth animations for screen recording">&#127916; Demo</button>
   <div id="rec-indicator"><span class="rec-dot"></span>REC</div>
   <button id="lang-btn" onclick="cycleLang()" title="Cambiar idioma / Change language">&#127758; <span id="lang-label">ES</span></button>
@@ -753,6 +788,7 @@
     </div>
   </div>
   <div id="canvas-container"></div>
+  <div id="conversation-thread"></div>
   <div id="memory-pill" onclick="toggleSettings();switchTab('memory')" title="Click to open memory tab"></div>
   <div id="status-bar">
     <p id="privacy-text">100% local &middot; nada sale de tu computadora</p>
@@ -803,6 +839,7 @@
     let connectedFolders = [];
     let localHistory = [];
     let currentAgentColor = '#e06438';
+    let currentAgentName = 'Clay';
     let pendingExec = null;
 
     // ═══ Speech Recognition ═══
@@ -1297,6 +1334,7 @@
         const d=await r.json();
         if(d.ok){
           const color = d.color_accent || '#e06438';
+          currentAgentName = name;
           setAgentColor(color);
           loadWorkflows(d.workflows||[]);
           if(d.disclaimer){
@@ -1496,23 +1534,23 @@
 
     // ═══ History ═══
     function addToHistory(role,content){localHistory.push({role,content,timestamp:new Date()});if(localHistory.length>40)localHistory=localHistory.slice(-40);}
-    async function loadHistory(){
-      try{
-        const r=await fetch('/api/history',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'});
-        const d=await r.json();
-        if(d.history) localHistory=d.history.map(h=>({...h,timestamp:new Date(h.timestamp)}));
-        renderHistory();
-      }catch(e){renderHistory();}
-    }
+    function loadHistory(){ renderHistory(); }
     function renderHistory(){
       const c=document.getElementById('session-history-list'); if(!c)return; c.innerHTML='';
       if(!localHistory.length){c.innerHTML='<p style="font-size:0.78rem;color:var(--faint);padding:12px 0;text-align:center;">Sin conversaciones a\u00FAn</p>';return;}
-      [...localHistory].reverse().slice(0,40).forEach(e=>{
+      [...localHistory].reverse().slice(0,40).forEach((e,revIdx)=>{
+        const origIdx=localHistory.length-1-revIdx;
         const div=document.createElement('div'); div.className='history-entry';
         const time=e.timestamp instanceof Date?e.timestamp.toLocaleTimeString('es-PR',{hour:'2-digit',minute:'2-digit'}):new Date(e.timestamp).toLocaleTimeString('es-PR',{hour:'2-digit',minute:'2-digit'});
         const preview=(e.content||'').substring(0,200);
         const isLong=e.role==='assistant'&&e.content&&e.content.length>500;
-        div.innerHTML='<div class="history-role '+e.role+'">'+(e.role==='user'?'T\u00FA':'OpenClay')+'</div><div class="history-text">'+escapeHtml(preview)+(e.content.length>200?'...':'')+'</div><div class="history-time">'+time+'</div>'+(isLong?'<button class="history-dl" onclick="dlResponse('+localHistory.indexOf(e)+')">Descargar</button>':'');
+        div.innerHTML='<div class="history-role '+e.role+'">'+(e.role==='user'?'T\u00FA':'OpenClay')+'</div><div class="history-text">'+escapeHtml(preview)+(e.content.length>200?'...':'')+'</div><div class="history-time">'+time+'</div>'+(isLong?'<button class="history-dl" onclick="dlResponse('+origIdx+')">Descargar</button>':'');
+        div.style.cursor='pointer';
+        div.addEventListener('click', function(ev){
+          if(ev.target.tagName==='BUTTON') return;
+          const bubble=document.getElementById('ct-msg-'+origIdx);
+          if(bubble){bubble.scrollIntoView({behavior:'smooth',block:'center'});toggleSettings();}
+        });
         c.appendChild(div);
       });
     }
@@ -1520,6 +1558,56 @@
       const e=localHistory[i]; if(!e)return;
       const b=new Blob([e.content],{type:'text/markdown'}); const u=URL.createObjectURL(b);
       const a=document.createElement('a'); a.href=u; a.download='openclay-'+new Date().toISOString().slice(0,10)+'.md'; a.click(); URL.revokeObjectURL(u);
+    }
+
+    // ═══ Conversation Thread DOM ═══
+    let _ctMsgIdx = 0;
+    function ctAppendUser(text) {
+      const thread = document.getElementById('conversation-thread');
+      if (!thread) return;
+      const div = document.createElement('div');
+      div.className = 'ct-bubble ct-bubble-user';
+      div.id = 'ct-msg-' + (_ctMsgIdx++);
+      div.textContent = text;
+      thread.appendChild(div);
+      thread.scrollTop = thread.scrollHeight;
+    }
+    function ctStartClay() {
+      const thread = document.getElementById('conversation-thread');
+      if (!thread) return null;
+      const wrap = document.createElement('div');
+      wrap.className = 'ct-bubble ct-bubble-clay';
+      wrap.id = 'ct-msg-' + (_ctMsgIdx++);
+      const label = document.createElement('div');
+      label.className = 'ct-agent-label';
+      label.textContent = currentAgentName || 'Clay';
+      label.style.color = currentAgentColor || 'var(--agent-color)';
+      wrap.appendChild(label);
+      const body = document.createElement('div');
+      body.className = 'ct-text';
+      const cur = document.createElement('span');
+      cur.className = 'ct-cursor';
+      body.appendChild(cur);
+      wrap.appendChild(body);
+      thread.appendChild(wrap);
+      thread.scrollTop = thread.scrollHeight;
+      return { wrap, body, cur };
+    }
+    function ctUpdateClay(h, text) {
+      if (!h) return;
+      h.body.textContent = text;
+      h.body.appendChild(h.cur);
+      const thread = document.getElementById('conversation-thread');
+      if (thread) thread.scrollTop = thread.scrollHeight;
+    }
+    function ctFinishClay(h) {
+      if (!h || !h.cur.parentNode) return;
+      h.cur.parentNode.removeChild(h.cur);
+    }
+    function ctClear() {
+      const thread = document.getElementById('conversation-thread');
+      if (thread) thread.innerHTML = '';
+      _ctMsgIdx = 0;
     }
 
     // ═══ Logs ═══
@@ -2470,6 +2558,7 @@
       }
       // Clear conversation state
       localHistory = [];
+      ctClear();
       if (typeof responseText !== 'undefined') responseText = '';
       if (typeof displayedText !== 'undefined') displayedText = '';
       if (typeof inputText !== 'undefined') inputText = '';
