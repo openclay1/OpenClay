@@ -126,10 +126,12 @@ DREAMS.md is always written immediately after a cycle. The diary paragraph appea
 
 Every feature is available to everyone. Clay Code, agent orchestration, scheduled tasks, multi-agent chains — all of it. No license key. No credit card. No upsell.
 
-If OpenClay helps you, consider [supporting the project](YOUR_GUMROAD_LINK). Pay what you want. It keeps development going.
+If OpenClay helps you, consider [supporting the project](OpenClay — Local AI by COANA Labs
+coanalabs.gumroad.com/l/OpenClay). Pay what you want. It keeps development going.
 
 ## Support
 
-OpenClay is free forever. If it helps you: [support the project →](YOUR_GUMROAD_LINK)
+OpenClay is free forever. If it helps you: [support the project →](OpenClay — Local AI by COANA Labs
+coanalabs.gumroad.com/l/OpenClay)
 
 Built by COANA Labs · San Juan, Puerto Rico
