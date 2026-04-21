@@ -57,24 +57,27 @@ cd OpenClay
 
 # 3. Run the installer (sets up virtualenv + dependencies)
 bash install.sh
-
-# 4. Launch
-python3 clay_server.py
 ```
 
-Open [http://localhost:3000](http://localhost:3000) in your browser.
+## Launch as App (macOS)
 
-Ollama starts automatically when the server launches. A banner at the top shows "Starting local model…" and dismisses when it's ready.
-
-## Run as a Mac app
-
-Generate a double-clickable app once — then just click it to launch:
+Run this once from the project folder to build a double-clickable app:
 
 ```bash
 bash create_app.sh
 ```
 
-This creates `OpenClay.app` in the project folder. Double-click it. Your browser opens to localhost:3000 automatically. The `.app` is gitignored — each user generates it locally.
+This creates `OpenClay.app` in the project folder. Double-click it — Ollama starts automatically in the background, the server starts, and your browser opens to [localhost:3000](http://localhost:3000). To quit, press Cmd+Q or right-click → Quit in the Dock. The server stops cleanly; Ollama keeps running.
+
+Move `OpenClay.app` to your Applications folder or Desktop for easy access. The `.app` is gitignored — each user builds it locally.
+
+**Or launch manually:**
+
+```bash
+python3 clay_server.py
+```
+
+Open [http://localhost:3000](http://localhost:3000). A banner shows "Starting local model…" and dismisses when it's ready.
 
 ## Tell Clay about yourself
 
