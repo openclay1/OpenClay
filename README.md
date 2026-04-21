@@ -87,6 +87,31 @@ I'm a pharmaceutical researcher in San Juan. I work on FDA compliance documents 
 
 The longer you use OpenClay, the more it builds on top of this foundation — using Mem0 to store memories from each conversation.
 
+## Memory & Dreaming
+
+After each session, OpenClay runs a background memory consolidation process called Dreaming. It has three phases:
+
+**Light** — reads today's conversation logs and extracts candidate sentences from Clay's responses. Computes how often each sentence appeared (frequency), how late in the session it occurred (recency), and how many different questions it came up in (query diversity).
+
+**REM** — asks the local model to classify each candidate (factual, experiential, belief, preference, or skill) and estimate how personally meaningful and conceptually rich it is. Combines those scores with the signals from the Light phase into a single composite score using six weighted signals:
+
+| Signal | Weight |
+|---|---|
+| Relevance (LLM-rated) | 0.30 |
+| Frequency | 0.24 |
+| Query diversity | 0.15 |
+| Recency | 0.15 |
+| Not already in memory (consolidation) | 0.10 |
+| Conceptual richness (LLM-rated) | 0.06 |
+
+**Deep** — promotes the top-scoring candidates (threshold: 0.55) to `MEMORY.md` and syncs to ChromaDB. At most 8 memories are promoted per cycle.
+
+**`MEMORY.md`** lives in the project root. It's the source of truth for everything the Dreaming system has learned about you — grouped by memory type, with a score annotation on each entry. You can edit it directly. The system respects your edits and won't overwrite them.
+
+**`DREAMS.md`** also lives in the project root. It's a human-readable diary of what Clay learned about you each session — one entry per cycle, newest first. Each entry lists the promoted memories and includes a short narrative paragraph Clay writes about the session.
+
+The whole system is fully local. No network calls. Runs on the same Ollama model as the rest of OpenClay. The diary paragraph is generated in a fire-and-forget background thread so it never delays inference or the memory writes.
+
 ## All features are free
 
 Every feature is available to everyone. Clay Code, agent orchestration, scheduled tasks, multi-agent chains — all of it. No license key. No credit card. No upsell.
