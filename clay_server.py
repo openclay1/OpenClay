@@ -8,6 +8,7 @@ import hashlib, glob as glob_module, uuid
 import urllib.request, urllib.error
 from datetime import datetime
 from pathlib import Path
+import memory_dreaming
 
 # Load .env if present
 _env_file = Path(__file__).parent / ".env"
@@ -1755,6 +1756,8 @@ def _save_conversation_turn(user_msg: str, assistant_msg: str):
             f.write(json.dumps({"role": "assistant", "content": assistant_msg, "timestamp": now}, ensure_ascii=False) + "\n")
     except Exception as e:
         print(f"  [conv] save error: {e}")
+    # Dreaming — non-blocking, 5-min cooldown
+    memory_dreaming.trigger_dreaming()
 
 # ── Wiki (Karpathy Layer 1) ──────────────────────────────────────
 def _get_relevant_wiki(query=""):
@@ -2990,6 +2993,14 @@ def main():
         print(f"ok  (Mem0, {count} memories)")
     else:
         print("fallback mode")
+    # Init Dreaming system
+    memory_dreaming.configure(
+        base_dir=BASE_DIR,
+        conv_dir=CONV_DIR,
+        ollama_url=OLLAMA_URL,
+        model=_detect_model(),
+    )
+    memory_dreaming.sync_memory_md_on_startup()
     # Init research memory
     if _init_research_memory():
         print("  Research memory (Hindsight-style) ready")
