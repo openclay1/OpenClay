@@ -112,6 +112,16 @@ After each session, OpenClay runs a background memory consolidation process call
 
 The whole system is fully local. No network calls. Runs on the same Ollama model as the rest of OpenClay. The diary paragraph is generated in a fire-and-forget background thread so it never delays inference or the memory writes.
 
+**After a session, look for these files:**
+
+```
+MEMORY.md      → your project root — promoted memories, grouped by type
+DREAMS.md      → your project root — diary entries, newest first
+memory_store/  → ChromaDB shadow index (don't edit manually)
+```
+
+DREAMS.md is always written immediately after a cycle. The diary paragraph appears within 60 seconds as a background process — if Ollama is slow, the memory list is always there regardless.
+
 ## All features are free
 
 Every feature is available to everyone. Clay Code, agent orchestration, scheduled tasks, multi-agent chains — all of it. No license key. No credit card. No upsell.
