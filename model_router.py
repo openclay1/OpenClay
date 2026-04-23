@@ -27,8 +27,9 @@ LOCAL = LOCAL_FAST  # backwards compat alias
 CLOUD = "CLOUD"
 
 # ── Model names for each tier ──
-MODEL_FAST = "gemma4:e4b"
-MODEL_SMART = "gemma4:26b"
+# Env overrides available: OLLAMA_MODEL_FAST, OLLAMA_MODEL_SMART
+MODEL_FAST = os.environ.get("OLLAMA_MODEL_FAST", "gemma4:e4b")
+MODEL_SMART = os.environ.get("OLLAMA_MODEL_SMART", "gemma4:26b")
 
 # Keywords that signal CLOUD-tier complexity
 CLOUD_SIGNALS = [

@@ -1,9 +1,11 @@
-# OpenClay v1.3 — COANA Labs
+from __future__ import annotations
+import os
+os.environ["MEM0_TELEMETRY"] = "false"
+os.environ["POSTHOG_DISABLED"] = "1"
 # Local AI Research Assistant
 # No data leaves this machine.
 # Memory: Mem0 + Karpathy Wiki + Procedural + Agentic + Hindsight
-from __future__ import annotations
-import http.server, io, json, os, re, subprocess, sys, threading, time, email.parser
+import http.server, io, json, re, subprocess, sys, threading, time, email.parser
 import hashlib, glob as glob_module, uuid
 import urllib.request, urllib.error
 from datetime import datetime
@@ -65,7 +67,8 @@ TASKS_DIR = BASE_DIR / "tasks"
 PROJECTS_DIR = BASE_DIR / "projects"
 TASK_METRICS_FILE = SANDBOX_DIR / "logs" / "task_metrics.jsonl"
 _ollama_proc = None
-_model = None
+_model = None            # active model name, or None if unavailable
+_model_resolved = False  # True once model detection has been attempted
 HARDWARE_PROFILE_FILE = BASE_DIR / "hardware_profile.json"
 _hardware_summary = ""  # one-line string injected into Clay Coder system prompt
 
@@ -198,7 +201,7 @@ def _load_soul():
     if custom_path.exists():
         parts.append(custom_path.read_text("utf-8"))
     _soul_text = "\n\n".join(parts)
-    model = _detect_model() if _is_ollama_running() else PREFERRED_MODELS[0]
+    model = _model or PREFERRED_MODELS[0]
     _soul_text = _soul_text.replace("[MODEL_NAME]", model)
     return _soul_text
 
@@ -243,38 +246,92 @@ def _ensure_ollama(max_wait: int = 10) -> bool:
     print("  [engine] recovery timed out after %ds" % max_wait)
     return False
 
-def ensure_ollama_running():
-    """Start Ollama if not already running. Called once at server startup."""
+def get_active_model():
+    """Cached model resolver: env var → stack.json → Ollama discovery.
+
+    Returns the model name string, or None if no model is available.
+    After the first call, _model_resolved is True and subsequent calls
+    return the cached value immediately with no I/O.
+    """
+    global _model, _model_resolved
+    if _model_resolved:
+        return _model
+    env_model = os.environ.get("OLLAMA_MODEL", "").strip()
+    if env_model:
+        _model = env_model; _model_resolved = True; return _model
+    stack_path = BASE_DIR / "data" / "stack.json"
+    if stack_path.exists():
+        try:
+            configured = json.loads(stack_path.read_text("utf-8")).get("model", {}).get("model", "")
+            if configured:
+                _model = configured; _model_resolved = True; return _model
+        except Exception:
+            pass
+    return _detect_model()
+
+def ensure_ollama_running() -> None:
+    """Start Ollama if not running. NEVER blocks — returns immediately.
+
+    If Ollama is already up, model detection runs in a background thread.
+    If Ollama needs starting, fires Popen and polls in a background thread.
+    In all cases the HTTP server is open and accepting requests before any
+    model detection completes. _model is set (or left None) by the thread.
+    """
+    global _model_resolved
+
+    if _is_ollama_running():
+        print("  [OLLAMA] already running — detecting model in background")
+        threading.Thread(target=_model_health_check, daemon=True, name="model-init").start()
+        return
+
+    # Attempt to start; return immediately whether it works or not
     try:
-        result = subprocess.run(["ollama", "list"], capture_output=True, timeout=3)
-        if result.returncode == 0:
-            print("  [OLLAMA] Already running.")
-            return
-    except Exception:
-        pass
-    print("  [OLLAMA] Starting Ollama in background…")
-    subprocess.Popen(
-        ["ollama", "serve"],
-        stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL,
-        start_new_session=True,
-    )
-    time.sleep(3)
-    print("  [OLLAMA] Ollama started.")
+        print("  [OLLAMA] not running — starting in background")
+        subprocess.Popen(
+            ["ollama", "serve"],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            start_new_session=True,
+        )
+    except FileNotFoundError:
+        print("  [OLLAMA] not installed — limited mode")
+        _model_resolved = True   # no model, mark resolved so callers use fallback
+        return
+    except Exception as e:
+        print(f"  [OLLAMA] could not start: {e} — limited mode")
+        _model_resolved = True
+        return
+
+    def _poll():
+        global _model_resolved
+        for _ in range(20):          # up to 10 s (0.5 s × 20)
+            time.sleep(0.5)
+            if _is_ollama_running():
+                _model_health_check()
+                print(f"  [OLLAMA] ready — model: {_model or 'none'}")
+                return
+        print("  [OLLAMA] did not respond in 10 s — limited mode")
+        _model_resolved = True       # mark resolved so callers don't keep retrying
+
+    threading.Thread(target=_poll, daemon=True, name="ollama-poll").start()
 
 def _detect_model():
-    global _model
-    if _model: return _model
+    global _model, _model_resolved
+    if _model_resolved:
+        return _model
     try:
         resp = urllib.request.urlopen(f"{OLLAMA_URL}/api/tags", timeout=5)
         available = [m["name"] for m in json.loads(resp.read()).get("models", [])]
         for pref in PREFERRED_MODELS:
             for avail in available:
                 if pref in avail or avail.startswith(pref.split(":")[0]):
-                    _model = avail; return _model
-        if available: _model = available[0]; return _model
-    except Exception: pass
-    _model = PREFERRED_MODELS[0]; return _model
+                    _model = avail; _model_resolved = True; return _model
+        if available:
+            _model = available[0]; _model_resolved = True; return _model
+    except Exception:
+        pass
+    # No models found — mark resolved with None so callers use fallback
+    _model = None; _model_resolved = True; return None
 
 def _get_available_models():
     """Return list of installed model names from Ollama."""
@@ -374,7 +431,7 @@ def _init_mem0():
         from mem0 import Memory
         config = {
             "llm": {"provider": "ollama", "config": {
-                "model": _detect_model(),
+                "model": get_active_model(),
                 "ollama_base_url": OLLAMA_URL
             }},
             "embedder": {"provider": "ollama", "config": {
@@ -626,7 +683,7 @@ def _research_get_context():
 
 def _extract_research_insights(prompt, response):
     """Background: classify conversation into factual/experiential/belief memories."""
-    if not _research_db: return
+    if not _research_db or _model is None: return
     def _worker():
         try:
             classify_prompt = f"""Analyze this exchange and extract structured memories.
@@ -636,7 +693,7 @@ Assistant: {response[:500]}
 
 Reply ONLY in JSON:
 {{"factual": ["fact1", "fact2"], "experiential": "one-line session summary", "belief": "inference about user goal or null"}}"""
-            body = json.dumps({"model": _detect_model(), "prompt": classify_prompt,
+            body = json.dumps({"model": get_active_model(), "prompt": classify_prompt,
                                "stream": False, "options": {"temperature": 0.2, "num_predict": 256}}).encode()
             req = urllib.request.Request(f"{OLLAMA_URL}/api/generate", data=body,
                                          headers={"Content-Type": "application/json"})
@@ -752,10 +809,12 @@ def _task_list():
     return tasks
 
 def _task_ollama_call(prompt, system="", timeout=TASK_LLM_TIMEOUT):
-    """Blocking Ollama call with timeout. Returns response text. Auto-recovers on failure."""
+    """Blocking Ollama call with timeout. Returns response text or raises on failure."""
+    if _model is None:
+        raise RuntimeError("No model available — running in limited mode")
     def _do_call():
         body = json.dumps({
-            "model": _detect_model(),
+            "model": get_active_model(),
             "prompt": prompt,
             "system": system,
             "stream": False,
@@ -1035,7 +1094,7 @@ def _task_run(task_id):
 
     task["status"] = "running"
     _task_save(task)
-    _log_write("system", f"Task started: {task['goal'][:100]}", _detect_model())
+    _log_write("system", f"Task started: {task['goal'][:100]}", _model or "none")
     start_time = datetime.now().isoformat()
 
     # Demo tasks: scripted execution bypasses LLM loop
@@ -1115,7 +1174,7 @@ def _task_run(task_id):
         _task_save(task)
         _log_write("system",
             f"Task {task_id[:8]} step {step_num}: {action_dict.get('action', '?')} \u2192 {'ok' if success else 'fail'}",
-            _detect_model())
+            _model or "none")
 
         # e. DECIDE
         if not success:
@@ -1794,6 +1853,8 @@ def _count_wiki_pages():
     return sum(1 for _ in WIKI_DIR.rglob("*.md"))
 
 def _generate_wiki_from_response(prompt, response):
+    if _model is None:
+        return
     def _worker():
         try:
             wiki_prompt = f"""Based on this conversation, create a short wiki entry.
@@ -1802,7 +1863,7 @@ Summary: 2-3 sentences. Key facts: 3-5 bullets.
 User asked: {prompt[:500]}
 Assistant answered: {response[:1000]}
 Reply ONLY in JSON: {{"title": "...", "category": "...", "summary": "...", "facts": ["..."]}}"""
-            body = json.dumps({"model": _detect_model(), "prompt": wiki_prompt,
+            body = json.dumps({"model": get_active_model(), "prompt": wiki_prompt,
                                "stream": False, "options": {"temperature": 0.3, "num_predict": 512}}).encode()
             req = urllib.request.Request(f"{OLLAMA_URL}/api/generate", data=body,
                                          headers={"Content-Type": "application/json"})
@@ -1820,13 +1881,15 @@ Reply ONLY in JSON: {{"title": "...", "category": "...", "summary": "...", "fact
 
 # ── Procedural Memory (Layer 2) ──────────────────────────────────
 def _update_preferences(prompt, response):
+    if _model is None:
+        return
     def _worker():
         try:
             pref_prompt = f"""Analyze this conversation and extract user behavior patterns.
 User said: {prompt[:500]}
 Assistant said: {response[:500]}
 List ONLY new observations. If nothing new, reply "none"."""
-            body = json.dumps({"model": _detect_model(), "prompt": pref_prompt,
+            body = json.dumps({"model": get_active_model(), "prompt": pref_prompt,
                                "stream": False, "options": {"temperature": 0.2, "num_predict": 256}}).encode()
             req = urllib.request.Request(f"{OLLAMA_URL}/api/generate", data=body,
                                          headers={"Content-Type": "application/json"})
@@ -1842,6 +1905,8 @@ List ONLY new observations. If nothing new, reply "none"."""
 
 # ── Agent Backend (Layer 3) ──────────────────────────────────────
 def _agentic_loop(prompt, handler):
+    if _model is None:
+        return "⚡ Limited mode — local model not available yet."
     system = _build_system_prompt(prompt)
     tool_instructions = """\n\nYou have these tools. Reply with EXACTLY the tool call on its own line:
 TOOL:READ_WIKI:filename
@@ -1853,7 +1918,7 @@ Use tools to gather info, then call TOOL:DONE with your final answer."""
     if loaded_document:
         full_prompt = f"[Document: {loaded_filename}]\n\n{loaded_document[:4000]}\n\n---\nUser: {prompt}"
     for iteration in range(5):
-        body = json.dumps({"model": _detect_model(), "prompt": full_prompt,
+        body = json.dumps({"model": _model, "prompt": full_prompt,
                            "system": system + tool_instructions,
                            "stream": False, "options": {"temperature": 0.7, "num_predict": 1024}}).encode()
         req = urllib.request.Request(f"{OLLAMA_URL}/api/generate", data=body,
@@ -2038,7 +2103,14 @@ class ClayHandler(http.server.SimpleHTTPRequestHandler):
                     models = [m["name"] for m in json.loads(resp.read()).get("models", [])]
                 except Exception:
                     pass
-            self._send_json({"running": running, "models": models, "active_model": _model or ""})
+            if _model:
+                status = "ready"
+            elif not _model_resolved:
+                status = "starting"
+            else:
+                status = "limited"
+            self._send_json({"running": running, "models": models,
+                             "active_model": _model or "", "status": status})
             return
         # Hardware profile
         if self.path == "/api/hardware":
@@ -2138,6 +2210,40 @@ class ClayHandler(http.server.SimpleHTTPRequestHandler):
         length = int(self.headers.get("Content-Length", 0))
         return self.rfile.read(length)
 
+    # ── Fallback: instant rule-based response when no model is available ──
+    def _fallback_response(self, prompt: str) -> str:
+        p = prompt.lower()
+        if "reverse" in p and "string" in p:
+            return "def reverse_string(s):\n    return s[::-1]"
+        if "hello world" in p:
+            return "print('Hello, world!')"
+        if "fibonacci" in p:
+            return "def fibonacci(n):\n    a, b = 0, 1\n    for _ in range(n):\n        yield a\n        a, b = b, a + b"
+        if "factorial" in p:
+            return "def factorial(n):\n    return 1 if n <= 1 else n * factorial(n - 1)"
+        if "sort" in p and "list" in p:
+            return "my_list = [3, 1, 4, 1, 5]\nmy_list.sort()          # in-place\nsorted_list = sorted(my_list)  # new list"
+        if "read file" in p or "open file" in p:
+            return "with open('file.txt', 'r') as f:\n    content = f.read()"
+        if "write file" in p:
+            return "with open('file.txt', 'w') as f:\n    f.write('content')"
+        if "python" in p:
+            return "# Limited mode — local model starting up\n\ndef main():\n    pass\n\nif __name__ == '__main__':\n    main()"
+        if any(w in p for w in ("hello", "hi", "hey")):
+            return "OpenClay is running. Local model is still starting — full responses available shortly."
+        if any(w in p for w in ("help", "what can you do", "capabilities")):
+            return "OpenClay is a local coding assistant. It can help with code, file edits, and explanations. The local model is still starting up."
+        return "⚡ Limited mode — local model not available yet. Try again in a moment."
+
+    def _send_fallback_stream(self, text: str) -> None:
+        """Send a fallback as a single NDJSON chunk matching the streaming format."""
+        self.send_response(200)
+        self.send_header("Content-Type", "application/x-ndjson")
+        self.send_header("Cache-Control", "no-cache")
+        self.send_header("Access-Control-Allow-Origin", "*")
+        self.end_headers()
+        self.wfile.write((json.dumps({"response": text, "done": True}, ensure_ascii=False) + "\n").encode())
+
     def _handle_ask(self):
         global AGENT_BACKEND
         body = json.loads(self._read_body())
@@ -2164,6 +2270,14 @@ class ClayHandler(http.server.SimpleHTTPRequestHandler):
         workflow_prefix = body.get("workflow_prompt", "")
         if workflow_prefix:
             prompt = f"{workflow_prefix}\n\n{prompt}"
+
+        # ── No model: return instant fallback, never hang ─────────────
+        if _model is None:
+            fallback = _fallback_response(self, prompt)
+            self._send_fallback_stream(fallback)
+            conversation_history.append({"role": "assistant", "content": fallback,
+                                          "timestamp": datetime.now().isoformat()})
+            return
 
         # Agentic mode
         if AGENT_BACKEND == "agentic":
@@ -2252,31 +2366,16 @@ class ClayHandler(http.server.SimpleHTTPRequestHandler):
                     try: self.wfile.write(meta_line.encode()); self.wfile.flush()
                     except Exception: pass
         except urllib.error.URLError as e:
-            print(f"  [engine] streaming call failed: {e}")
-            # Silent recovery attempt
-            if _ensure_ollama(max_wait=10):
-                try:
-                    req2 = urllib.request.Request(f"{OLLAMA_URL}/api/generate", data=ollama_body,
-                                                  headers={"Content-Type": "application/json"})
-                    resp2 = urllib.request.urlopen(req2, timeout=120)
-                    self.send_response(200)
-                    self.send_header("Content-Type", "application/x-ndjson")
-                    self.send_header("Cache-Control", "no-cache")
-                    self.send_header("Access-Control-Allow-Origin", "*")
-                    self.end_headers()
-                    for line in resp2:
-                        self.wfile.write(line); self.wfile.flush()
-                    return
-                except Exception as e2:
-                    print(f"  [engine] retry also failed: {e2}")
-            # User-facing: never mention Ollama by name
-            self.send_response(503)
-            self.send_header("Content-Type", "application/json")
-            self.send_header("Access-Control-Allow-Origin", "*")
-            self.end_headers()
-            self.wfile.write(json.dumps({
-                "error": "Clay needs a moment to start. Please try again in a few seconds."
-            }).encode())
+            # Engine dropped mid-stream. Return fallback immediately; try recovery in background.
+            print(f"  [engine] call failed: {e}")
+            global _model, _model_resolved
+            _model = None; _model_resolved = False  # allow re-detection on next request
+            threading.Thread(target=_ensure_ollama, kwargs={"max_wait": 10},
+                             daemon=True, name="engine-recovery").start()
+            try:
+                self._send_fallback_stream(self._fallback_response(prompt))
+            except Exception:
+                pass
         except Exception as e:
             self._send_json({"error": str(e)}, 500)
 
@@ -2355,7 +2454,7 @@ class ClayHandler(http.server.SimpleHTTPRequestHandler):
         self._send_json({
             "wiki_pages": _count_wiki_pages(), "preferences_active": prefs_active,
             "mode": AGENT_BACKEND, "document": loaded_filename,
-            "new_ingested": count, "model": _detect_model(),
+            "new_ingested": count, "model": _model or "",
             "agent": agent_name, "memory_count": mem_count,
             "log_entries": len(_log_read_today()),
             "color_accent": _current_agent.get("color_accent", "#e06438") if _current_agent else "#e06438",
@@ -2962,10 +3061,9 @@ def main():
     for d in [WIKI_DIR / "regulations", WIKI_DIR / "papers", WIKI_DIR / "cases",
               MEMORY_DIR, WATCHERS_DIR, AGENTS_DIR, LOGS_DIR, SANDBOX_DIR, MEMORY_STORE_DIR, TASKS_DIR, PROJECTS_DIR]:
         d.mkdir(parents=True, exist_ok=True)
-    # Ensure Ollama is running before the server opens for requests
+    # Fire Ollama in background — NEVER blocks. Model detection runs in a thread.
     ensure_ollama_running()
     # Load soul
-    soul = _load_soul()
     if soul:
         custom = (BASE_DIR / "soul_custom.md").exists()
         print(f"  Soul loaded ({len(soul)} chars" + (" + custom" if custom else "") + ")")
@@ -2975,8 +3073,7 @@ def main():
     print(f"  TTS engine: {hw.get('tts_engine','browser')}")
     # Check for better models (logs recommendations, no auto-install)
     _check_for_better_models()
-    # Model health check on startup + every 30 min
-    _model_health_check()
+    # Periodic model health refresh every 30 min (initial check is in ensure_ollama_running)
     _start_model_health_thread()
     # Load agents
     _load_agents()
@@ -2998,7 +3095,7 @@ def main():
         base_dir=BASE_DIR,
         conv_dir=CONV_DIR,
         ollama_url=OLLAMA_URL,
-        model=_detect_model(),
+        model=_model or PREFERRED_MODELS[0],  # dreaming will use whatever is set at cycle time
     )
     memory_dreaming.sync_memory_md_on_startup()
     # Init research memory

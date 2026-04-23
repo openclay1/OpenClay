@@ -40,15 +40,26 @@ def _read_env_key(key: str) -> str:
 
 
 def get_backend() -> str:
-    """Return the configured backend: 'clawcode' or 'claudecode'."""
+    """Return the configured backend: 'clawcode' or 'claudecode'.
+
+    Reads AGENT_BACKEND env var; defaults to 'claudecode'.
+    """
     val = _read_env_key("AGENT_BACKEND").lower().strip()
     if val in ("clawcode", "claw", "claw-code", "claw_code"):
         return "clawcode"
+    if val in ("claudecode", "claude", "claude-code", "claude_code", "simple"):
+        return "claudecode"
     return "claudecode"
 
 
 def get_model() -> str:
-    """Return the configured Ollama model name."""
+    """Return the configured Ollama model name.
+
+    Reads OLLAMA_MODEL env var, then data/stack.json, then returns a default.
+    """
+    env_model = os.environ.get("OLLAMA_MODEL", "").strip()
+    if env_model:
+        return env_model
     stack_path = DATA_DIR / "stack.json"
     if stack_path.exists():
         with open(stack_path) as f:
