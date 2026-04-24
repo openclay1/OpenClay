@@ -5,7 +5,7 @@ const { spawn } = require('child_process');
 const path = require('path');
 const net = require('net');
 
-const BACKEND_PORT = 3000;
+const BACKEND_PORT = 8100;
 const BACKEND_URL = `http://localhost:${BACKEND_PORT}`;
 const isDev = process.env.NODE_ENV === 'development';
 
@@ -26,14 +26,15 @@ function findPython() {
 }
 
 function startBackend() {
+  // Points at claycode/clay_server.py — one level up from electron/ within the claycode repo
   const serverPath = path.join(__dirname, '..', 'clay_server.py');
-  const cwd = path.join(__dirname, '..');
+  const cwd = path.join(__dirname, '..');  // claycode repo root
   const python = findPython();
 
   backendProc = spawn(python, [serverPath], {
     cwd,
     stdio: ['ignore', 'pipe', 'pipe'],
-    env: { ...process.env, PYTHONUNBUFFERED: '1' },
+    env: { ...process.env, PYTHONUNBUFFERED: '1', PORT: String(BACKEND_PORT) },
     detached: false,
   });
 
