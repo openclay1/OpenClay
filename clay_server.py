@@ -159,46 +159,125 @@ def _load_soul():
     return _soul_text
 
 # ── Optional model hook ──────────────────────────────────────────
-def _maybe_generate(prompt: str, system: str = "", timeout: int = 60) -> str | None:
-    """Call an OpenAI-compatible API if configured; return None otherwise.
+_NO_MODEL_MSG = (
+    "I'm running without a model. Set OPENAI_API_KEY or ANTHROPIC_API_KEY "
+    "in your environment to enable AI. Type 'demo' to see what I can do."
+)
 
-    Wire a model by setting env vars before starting the server:
-      OPENAI_API_KEY   — required for cloud providers; omit for local servers
-      OPENAI_API_BASE  — default: http://localhost:1234/v1  (LM Studio, llama.cpp, etc.)
-      OPENAI_MODEL     — default: local-model
+def _detect_provider() -> str:
+    """Return which provider is configured: 'local' | 'anthropic' | 'openai' | 'none'."""
+    if os.environ.get("CLAY_API_ENDPOINT"):
+        return "local"
+    if os.environ.get("ANTHROPIC_API_KEY"):
+        return "anthropic"
+    if os.environ.get("OPENAI_API_KEY"):
+        return "openai"
+    return "none"
 
-    Returns response text, or None — callers must provide a deterministic fallback.
-    Server starts and runs fully with ZERO environment variables set.
+def _maybe_generate(prompt: str, system: str = "", timeout: int = 15) -> str | None:
+    """Call the configured model API; return None on any failure.
+
+    Priority (first configured wins):
+      1. CLAY_API_ENDPOINT  — any OpenAI-compatible local endpoint
+      2. ANTHROPIC_API_KEY  — claude-3-5-haiku-20241022 (fast, cheap)
+      3. OPENAI_API_KEY     — OPENAI_MODEL (default gpt-4o-mini)
+                              via OPENAI_API_BASE (default api.openai.com/v1)
+
+    Returns response text, or None — callers fall back to deterministic responses.
+    Server runs fully with ZERO environment variables set.
     """
     global _model
-    api_base = os.environ.get("OPENAI_API_BASE", "http://localhost:1234/v1")
-    api_key = os.environ.get("OPENAI_API_KEY", "")
-    model_name = os.environ.get("OPENAI_MODEL", "local-model")
-    try:
-        messages = []
-        if system:
-            messages.append({"role": "system", "content": system})
-        messages.append({"role": "user", "content": prompt})
-        body = json.dumps({
-            "model": model_name,
-            "messages": messages,
-            "stream": False,
-            "temperature": 0.3,
-            "max_tokens": 2048,
-        }).encode()
-        headers = {"Content-Type": "application/json"}
-        if api_key:
-            headers["Authorization"] = f"Bearer {api_key}"
-        req = urllib.request.Request(
-            f"{api_base}/chat/completions", data=body, headers=headers
-        )
-        resp = urllib.request.urlopen(req, timeout=timeout)
-        text = json.loads(resp.read())["choices"][0]["message"]["content"]
-        if _model is None:
-            _model = model_name   # mark model available on first success
-        return text
-    except Exception:
-        return None
+
+    # ── 1. Local OpenAI-compatible endpoint ──────────────────────
+    clay_endpoint = os.environ.get("CLAY_API_ENDPOINT", "")
+    if clay_endpoint:
+        try:
+            messages = []
+            if system:
+                messages.append({"role": "system", "content": system})
+            messages.append({"role": "user", "content": prompt})
+            body = json.dumps({
+                "model": os.environ.get("CLAY_MODEL", "local-model"),
+                "messages": messages,
+                "stream": False,
+                "temperature": 0.3,
+                "max_tokens": 2048,
+            }).encode()
+            req = urllib.request.Request(
+                f"{clay_endpoint.rstrip('/')}/chat/completions",
+                data=body,
+                headers={"Content-Type": "application/json"},
+            )
+            resp = urllib.request.urlopen(req, timeout=timeout)
+            text = json.loads(resp.read())["choices"][0]["message"]["content"]
+            if _model is None:
+                _model = "local"
+            return text
+        except Exception:
+            return None
+
+    # ── 2. Anthropic ─────────────────────────────────────────────
+    anthropic_key = os.environ.get("ANTHROPIC_API_KEY", "")
+    if anthropic_key:
+        try:
+            body_dict: dict = {
+                "model": os.environ.get("ANTHROPIC_MODEL", "claude-3-5-haiku-20241022"),
+                "max_tokens": 2048,
+                "messages": [{"role": "user", "content": prompt}],
+            }
+            if system:
+                body_dict["system"] = system
+            req = urllib.request.Request(
+                "https://api.anthropic.com/v1/messages",
+                data=json.dumps(body_dict).encode(),
+                headers={
+                    "Content-Type": "application/json",
+                    "x-api-key": anthropic_key,
+                    "anthropic-version": "2023-06-01",
+                },
+            )
+            resp = urllib.request.urlopen(req, timeout=timeout)
+            text = json.loads(resp.read())["content"][0]["text"]
+            if _model is None:
+                _model = "anthropic"
+            return text
+        except Exception:
+            return None
+
+    # ── 3. OpenAI ────────────────────────────────────────────────
+    openai_key = os.environ.get("OPENAI_API_KEY", "")
+    if openai_key:
+        try:
+            api_base = os.environ.get("OPENAI_API_BASE", "https://api.openai.com/v1")
+            model_name = os.environ.get("OPENAI_MODEL", "gpt-4o-mini")
+            messages = []
+            if system:
+                messages.append({"role": "system", "content": system})
+            messages.append({"role": "user", "content": prompt})
+            body = json.dumps({
+                "model": model_name,
+                "messages": messages,
+                "stream": False,
+                "temperature": 0.3,
+                "max_tokens": 2048,
+            }).encode()
+            req = urllib.request.Request(
+                f"{api_base.rstrip('/')}/chat/completions",
+                data=body,
+                headers={
+                    "Content-Type": "application/json",
+                    "Authorization": f"Bearer {openai_key}",
+                },
+            )
+            resp = urllib.request.urlopen(req, timeout=timeout)
+            text = json.loads(resp.read())["choices"][0]["message"]["content"]
+            if _model is None:
+                _model = model_name
+            return text
+        except Exception:
+            return None
+
+    return None
 
 # ── Mem0 Persistent Memory ──────────────────────────────────────
 def _init_mem0():
@@ -575,7 +654,7 @@ def _task_ollama_call(prompt, system="", timeout=TASK_LLM_TIMEOUT):
     """LLM call via _maybe_generate. Raises RuntimeError if no model is available."""
     result = _maybe_generate(prompt, system=system, timeout=timeout)
     if result is None:
-        raise RuntimeError("No model available — running in limited mode")
+        raise RuntimeError(_NO_MODEL_MSG)
     return result
 
 def _task_auto_summarize(task):
@@ -1647,7 +1726,7 @@ Use tools to gather info, then call TOOL:DONE with your final answer."""
     for iteration in range(5):
         text = _maybe_generate(full_prompt, system=system + tool_instructions, timeout=120)
         if text is None:
-            return "⚡ Limited mode — no model available. Set OPENAI_API_KEY or OPENAI_API_BASE to enable."
+            return _NO_MODEL_MSG
         if "TOOL:READ_WIKI:" in text:
             fname = text.split("TOOL:READ_WIKI:")[1].split("\n")[0].strip()
             for md in WIKI_DIR.rglob("*.md"):
@@ -1782,7 +1861,7 @@ def _builder_ollama_call(prompt: str, system: str = "", timeout: int = 90) -> st
     """LLM call for file generation via _maybe_generate. Raises RuntimeError if unavailable."""
     result = _maybe_generate(prompt, system=system, timeout=timeout)
     if result is None:
-        raise RuntimeError("No model available")
+        raise RuntimeError(_NO_MODEL_MSG)
     return result
 
 
@@ -2247,6 +2326,22 @@ class ClayHandler(http.server.SimpleHTTPRequestHandler):
         else: self.send_error(404)
 
     def do_GET(self):
+        # Model status — frontend uses this for the status indicator
+        if self.path == "/api/status":
+            provider = _detect_provider()
+            ready = _model is not None
+            _msg = {
+                "local":     f"Local model ready ({os.environ.get('CLAY_MODEL', 'local-model')})",
+                "anthropic": f"Anthropic ready ({os.environ.get('ANTHROPIC_MODEL', 'claude-3-5-haiku-20241022')})",
+                "openai":    f"OpenAI ready ({os.environ.get('OPENAI_MODEL', 'gpt-4o-mini')})",
+                "none":      _NO_MODEL_MSG,
+            }
+            self._send_json({
+                "model":   provider,
+                "ready":   ready,
+                "message": _msg[provider],
+            })
+            return
         # Live-reload signal — polled by injected browser script every 1s
         if self.path == "/__clay_reload__":
             self.send_response(200)
@@ -2405,12 +2500,8 @@ class ClayHandler(http.server.SimpleHTTPRequestHandler):
         if "write file" in p:
             return "with open('file.txt', 'w') as f:\n    f.write('content')"
         if "python" in p:
-            return "# Limited mode — local model starting up\n\ndef main():\n    pass\n\nif __name__ == '__main__':\n    main()"
-        if any(w in p for w in ("hello", "hi", "hey")):
-            return "OpenClay is running. Local model is still starting — full responses available shortly."
-        if any(w in p for w in ("help", "what can you do", "capabilities")):
-            return "OpenClay is a local coding assistant. It can help with code, file edits, and explanations. The local model is still starting up."
-        return "⚡ Limited mode — local model not available yet. Try again in a moment."
+            return "# No model configured\n\ndef main():\n    pass\n\nif __name__ == '__main__':\n    main()"
+        return _NO_MODEL_MSG
 
     def _send_fallback_stream(self, text: str) -> None:
         """Send a fallback as a single NDJSON chunk matching the streaming format."""
@@ -2890,7 +2981,7 @@ class ClayHandler(http.server.SimpleHTTPRequestHandler):
                 if prev_output:
                     sys_prompt += f"\n\nPrevious agent output:\n{prev_output}"
                 try:
-                    result_text = _maybe_generate(goal, system=sys_prompt, timeout=90) or f"[No model available — set OPENAI_API_KEY or OPENAI_API_BASE]"
+                    result_text = _maybe_generate(goal, system=sys_prompt, timeout=90) or _NO_MODEL_MSG
                 except Exception as e:
                     result_text = f"[Error: {e}]"
                 prev_output = result_text
