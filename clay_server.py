@@ -68,6 +68,8 @@ PROJECTS_DIR = BASE_DIR / "projects"
 WORKSPACE_DIR = Path.home() / "OpenClay" / "projects"
 _BUILD_PORT_START = 8100
 _build_servers: dict = {}   # slug -> {"port": int, "proc": subprocess.Popen}
+_last_update_ts: str = ""   # live reload signal — browser polls this
+_active_project: dict = {}  # {"path": str, "port": int} for the current built project
 TASK_METRICS_FILE = SANDBOX_DIR / "logs" / "task_metrics.jsonl"
 _ollama_proc = None
 _model = None            # active model name, or None if unavailable
@@ -2209,6 +2211,154 @@ def _find_free_port(start: int = _BUILD_PORT_START) -> int:
     return start
 
 
+def _touch_reload() -> None:
+    """Bump the live-reload timestamp so polling browsers reload."""
+    global _last_update_ts
+    _last_update_ts = str(time.time())
+
+
+def _inject_live_reload_to_project(project_path: str) -> None:
+    """Inject a polling live-reload snippet into every .html file in the project."""
+    snippet = (
+        "<script>\n"
+        "(function(){\n"
+        "  var _ts='';\n"
+        "  setInterval(function(){\n"
+        f"    fetch('http://localhost:{PORT}/__clay_reload__')\n"
+        "      .then(function(r){return r.text();})\n"
+        "      .then(function(ts){\n"
+        "        if(_ts&&_ts!==ts){location.reload();}\n"
+        "        _ts=ts;\n"
+        "      }).catch(function(){});\n"
+        "  },1000);\n"
+        "})();\n"
+        "</script>"
+    )
+    for html_file in Path(project_path).glob("*.html"):
+        content = html_file.read_text(encoding="utf-8", errors="ignore")
+        if "/__clay_reload__" in content:
+            continue
+        if "</body>" in content:
+            content = content.replace("</body>", snippet + "\n</body>", 1)
+        else:
+            content = content + "\n" + snippet
+        html_file.write_text(content, encoding="utf-8")
+
+
+_MODIFY_VERBS = {"add", "change", "update", "remove", "fix", "improve",
+                 "turn", "switch", "style", "adjust", "rename", "delete",
+                 "replace", "make", "give", "set"}
+
+
+def _is_modify_intent(prompt: str) -> bool:
+    """True only when there is an active project AND the prompt reads as an edit request."""
+    if not _active_project.get("path"):
+        return False
+    words = set(re.findall(r'\w+', prompt.lower()))
+    return bool(words & _MODIFY_VERBS)
+
+
+def _apply_deterministic_edit(prompt: str, project_path: str) -> list:
+    """Rule-based file mutations when no model is available."""
+    p = prompt.lower()
+    html_files = sorted(Path(project_path).glob("*.html"))
+    css_files  = sorted(Path(project_path).glob("*.css"))
+    written = []
+
+    if "dark mode" in p or "dark theme" in p:
+        dark_css = (
+            "\n/* Dark mode — ClayCode */\n"
+            "body{background:#1a1a1a!important;color:#e0e0e0!important;}\n"
+            ".container,main,section,div{background:#2a2a2a!important;}\n"
+            "h1,h2,h3{color:#e06438!important;}\n"
+            "a{color:#f0a080;}\n"
+            "button{background:#e06438!important;color:#fff!important;}\n"
+        )
+        if css_files:
+            f = css_files[0]
+            f.write_text(f.read_text(encoding="utf-8") + dark_css, encoding="utf-8")
+            written.append(f.name)
+        elif html_files:
+            f = html_files[0]
+            content = f.read_text(encoding="utf-8")
+            if "</style>" in content:
+                content = content.replace("</style>", dark_css + "</style>", 1)
+            else:
+                content = content.replace("</head>", f"<style>{dark_css}</style>\n</head>", 1)
+            f.write_text(content, encoding="utf-8")
+            written.append(f.name)
+
+    if "button" in p and html_files and not written:
+        m = re.search(r'button\s+(?:that\s+)?(?:says?\s+|labeled?\s+)?["\']?([^"\'<\n]{1,40})', p)
+        label = m.group(1).strip().title() if m else "Click Me"
+        f = html_files[0]
+        content = f.read_text(encoding="utf-8")
+        btn = f'<button onclick="alert(\'{label} clicked!\')" style="margin:8px;padding:8px 18px;border-radius:6px;border:none;background:#e06438;color:#fff;cursor:pointer">{label}</button>\n'
+        content = content.replace("</body>", btn + "</body>", 1)
+        f.write_text(content, encoding="utf-8")
+        written.append(f.name)
+
+    if not written:
+        # Generic: timestamp comment so the reload fires and browser sees a fresh file
+        target = html_files[0] if html_files else (css_files[0] if css_files else None)
+        if target:
+            content = target.read_text(encoding="utf-8")
+            ts = datetime.now().strftime("%H:%M:%S")
+            if target.suffix == ".html":
+                content = content.replace("</body>",
+                    f"<!-- ClayCode edit {ts}: {prompt[:60]} -->\n</body>", 1)
+            else:
+                content += f"\n/* ClayCode edit {ts}: {prompt[:60]} */\n"
+            target.write_text(content, encoding="utf-8")
+            written.append(target.name)
+
+    if written:
+        _inject_live_reload_to_project(project_path)
+        _touch_reload()
+    return written
+
+
+def _update_project_files(prompt: str, project_path: str) -> list:
+    """Apply modifications to an existing project (model or deterministic fallback)."""
+    ptype = _project_type(prompt)
+    if _model is None:
+        return _apply_deterministic_edit(prompt, project_path)
+
+    p = Path(project_path)
+    file_contexts = []
+    for ext in ("*.html", "*.css", "*.js", "*.py"):
+        for f in sorted(p.glob(ext)):
+            content = f.read_text(encoding="utf-8", errors="ignore")[:3000]
+            file_contexts.append(
+                f"=== FILENAME: {f.name} ===\n{content}\n=== END ==="
+            )
+    context = "\n\n".join(file_contexts) if file_contexts else "(empty project)"
+
+    gen_prompt = (
+        f"Existing project files:\n{context}\n\n"
+        f"Modification request: {prompt}\n\n"
+        f"Output ONLY the files that need to change using EXACTLY this format:\n"
+        f"=== FILENAME: <name> ===\n<complete updated file content>\n=== END ===\n\n"
+        f"Write the full file content, not a diff. Only include changed files."
+    )
+    try:
+        response = _builder_ollama_call(
+            gen_prompt,
+            system=(
+                "You are a code editor. Apply the requested changes and output only "
+                "modified files in the === FILENAME === format. No explanations."
+            ),
+        )
+        written = _parse_builder_response(response, ptype, project_path)
+        if written:
+            _inject_live_reload_to_project(project_path)
+            _touch_reload()
+            return written
+    except Exception:
+        pass
+    return _apply_deterministic_edit(prompt, project_path)
+
+
 def _run_project(project_path: str) -> dict:
     """Run the project. Returns {"url": str, "output": str}."""
     p = Path(project_path)
@@ -2308,6 +2458,15 @@ class ClayHandler(http.server.SimpleHTTPRequestHandler):
         else: self.send_error(404)
 
     def do_GET(self):
+        # Live-reload signal — polled by injected browser script every 1s
+        if self.path == "/__clay_reload__":
+            self.send_response(200)
+            self.send_header("Content-Type", "text/plain")
+            self.send_header("Access-Control-Allow-Origin", "*")
+            self.send_header("Cache-Control", "no-cache")
+            self.end_headers()
+            self.wfile.write(_last_update_ts.encode())
+            return
         # Handle GET /api/tasks (list all)
         if self.path == "/api/tasks":
             self._handle_tasks_list()
@@ -2524,19 +2683,26 @@ class ClayHandler(http.server.SimpleHTTPRequestHandler):
             self.wfile.write((json.dumps({"response": "", "done": True}) + "\n").encode())
             return
 
+        # Inject live-reload into HTML files and bump timestamp
+        _inject_live_reload_to_project(project_path)
+        _touch_reload()
         _emit("\n")
 
         # Step 3: run project
         result = _run_project(project_path)
 
-        # Step 4: summary + auto-open browser
+        # Step 4: record active project, summary, auto-open browser
+        global _active_project
         if result.get("url"):
+            _active_project = {"path": project_path, "port": _build_servers.get(slug, {}).get("port", 0)}
             webbrowser.open(result["url"])
             _emit(f"\u2705 **Running at:** [{result['url']}]({result['url']})\n")
-            _emit(f"\U0001f310 Browser opened automatically.\n\n")
+            _emit(f"\U0001f310 Browser opened automatically.\n")
+            _emit(f"\U0001f4a1 Say **\"add dark mode\"** or **\"add a button\"** to edit live.\n\n")
             _emit(f"\U0001f4c1 Project folder: `{project_path}`\n")
             summary = f"Built `{slug}` — running at {result['url']}"
         elif result.get("output"):
+            _active_project = {"path": project_path, "port": 0}
             _emit(f"\u2705 **Output:**\n```\n{result['output'][:2000]}\n```\n\n")
             _emit(f"\U0001f4c1 Project folder: `{project_path}`\n")
             summary = f"Ran `{slug}` — output captured"
@@ -2546,6 +2712,58 @@ class ClayHandler(http.server.SimpleHTTPRequestHandler):
 
         self.wfile.write((json.dumps({"response": "", "done": True}, ensure_ascii=False) + "\n").encode())
 
+        conversation_history.append({"role": "assistant", "content": summary,
+                                      "timestamp": datetime.now().isoformat()})
+        _log_write("assistant", summary)
+
+    def _handle_modify(self, prompt: str) -> None:
+        """Apply edits to the active project and trigger live reload in browser."""
+        def _emit(text: str) -> None:
+            try:
+                self.wfile.write(
+                    (json.dumps({"response": text, "done": False}, ensure_ascii=False) + "\n").encode()
+                )
+                self.wfile.flush()
+            except Exception:
+                pass
+
+        self.send_response(200)
+        self.send_header("Content-Type", "application/x-ndjson")
+        self.send_header("Cache-Control", "no-cache")
+        self.send_header("Access-Control-Allow-Origin", "*")
+        self.end_headers()
+
+        project_path = _active_project.get("path", "")
+        if not project_path or not Path(project_path).exists():
+            _emit("No active project to modify. Build something first.\n")
+            self.wfile.write((json.dumps({"response": "", "done": True}) + "\n").encode())
+            return
+
+        slug = Path(project_path).name
+        _emit(f"\U0001f527 **Updating** `{slug}`\n\n")
+
+        try:
+            files_updated = _update_project_files(prompt, project_path)
+            source = "model" if _model else "rule"
+            for fname in files_updated:
+                _emit(f"\U0001f4c4 `{fname}` ({source})\n")
+        except Exception as exc:
+            _emit(f"\u26a0\ufe0f Update error: {exc}\n")
+            files_updated = []
+
+        if files_updated:
+            port = _active_project.get("port", 0)
+            url = f"http://localhost:{port}" if port else ""
+            if url:
+                _emit(f"\n\u2728 Changes applied — browser refreshing at {url}\n")
+            else:
+                _emit(f"\n\u2728 Changes applied.\n")
+            summary = f"Updated `{slug}` — {', '.join(files_updated)}"
+        else:
+            _emit("\n\u26a0\ufe0f No changes applied.\n")
+            summary = f"Modification attempted on `{slug}` — no changes"
+
+        self.wfile.write((json.dumps({"response": "", "done": True}, ensure_ascii=False) + "\n").encode())
         conversation_history.append({"role": "assistant", "content": summary,
                                       "timestamp": datetime.now().isoformat()})
         _log_write("assistant", summary)
@@ -2577,7 +2795,12 @@ class ClayHandler(http.server.SimpleHTTPRequestHandler):
         if workflow_prefix:
             prompt = f"{workflow_prefix}\n\n{prompt}"
 
-        # ── Build intent: create files → run → open browser ───────────
+        # ── Modify active project (checked first — has higher priority than build) ──
+        if _is_modify_intent(prompt):
+            self._handle_modify(prompt)
+            return
+
+        # ── Build new project ─────────────────────────────────────────
         # Runs before model-None guard so template builds work without a model.
         if _is_build_intent(prompt):
             self._handle_build(prompt)
