@@ -2151,6 +2151,16 @@ def _write_templates(ptype: str, project_path: str) -> list:
     return ["index.html", "style.css", "script.js"]
 
 
+def _is_valid_write(fname: str, content: str) -> bool:
+    """Reject empty content and structurally broken HTML — keep existing file instead."""
+    if not content.strip():
+        return False
+    if fname.endswith(".html"):
+        low = content.lower()
+        return "<html" in low or "<!doctype" in low
+    return True
+
+
 def _parse_builder_response(response: str, ptype: str, project_path: str) -> list:
     """Extract === FILENAME: x === blocks from model response; falls back to raw code fence."""
     written = []
@@ -2158,7 +2168,7 @@ def _parse_builder_response(response: str, ptype: str, project_path: str) -> lis
     for match in re.finditer(r"=== FILENAME: (\S+) ===\n(.*?)=== END ===", response, re.DOTALL):
         fname = match.group(1).strip()
         content = match.group(2).strip()
-        if fname and content:
+        if fname and _is_valid_write(fname, content):
             fpath = p / fname
             fpath.parent.mkdir(parents=True, exist_ok=True)
             fpath.write_text(content, encoding="utf-8")
@@ -2166,10 +2176,10 @@ def _parse_builder_response(response: str, ptype: str, project_path: str) -> lis
     if written:
         return written
     # Model didn't use the format — strip fences, write primary file
+    fname = "main.py" if ptype == "python" else "index.html"
     code = re.sub(r"^```[\w]*\n?", "", response.strip())
     code = re.sub(r"\n?```$", "", code).strip()
-    if code:
-        fname = "main.py" if ptype == "python" else "index.html"
+    if code and _is_valid_write(fname, code):
         (p / fname).write_text(code, encoding="utf-8")
         return [fname]
     return []
@@ -2218,23 +2228,40 @@ def _touch_reload() -> None:
 
 
 def _inject_live_reload_to_project(project_path: str) -> None:
-    """Inject a polling live-reload snippet into every .html file in the project."""
+    """Inject fade live-reload snippet into every .html file; add transition CSS once."""
     snippet = (
         "<script>\n"
         "(function(){\n"
         "  var _ts='';\n"
+        # Restore scroll position saved before last reload
+        "  var _s=localStorage.getItem('__clay_scroll');\n"
+        "  if(_s){window.scrollTo(0,parseInt(_s,10));localStorage.removeItem('__clay_scroll');}\n"
         "  setInterval(function(){\n"
         f"    fetch('http://localhost:{PORT}/__clay_reload__')\n"
-        "      .then(function(r){return r.text();})\n"
-        "      .then(function(ts){\n"
-        "        if(_ts&&_ts!==ts){location.reload();}\n"
+        "      .then(function(r){{return r.text();}})\n"
+        "      .then(function(ts){{\n"
+        "        if(_ts&&_ts!==ts){{\n"
+        "          localStorage.setItem('__clay_scroll',window.scrollY);\n"
+        "          document.body.style.opacity='0';\n"
+        "          setTimeout(function(){{location.reload();}},150);\n"
+        "        }}\n"
         "        _ts=ts;\n"
-        "      }).catch(function(){});\n"
+        "      }}).catch(function(){{}});\n"
         "  },1000);\n"
         "})();\n"
         "</script>"
     )
-    for html_file in Path(project_path).glob("*.html"):
+    p = Path(project_path)
+    # Inject fade transition into first CSS file once
+    for css_file in p.glob("*.css"):
+        css = css_file.read_text(encoding="utf-8", errors="ignore")
+        if "__clay_fade" not in css:
+            css_file.write_text(
+                css + "\n/* __clay_fade */\nbody{transition:opacity 0.2s ease-in-out;}\n",
+                encoding="utf-8"
+            )
+        break
+    for html_file in p.glob("*.html"):
         content = html_file.read_text(encoding="utf-8", errors="ignore")
         if "/__clay_reload__" in content:
             continue
@@ -2259,56 +2286,62 @@ def _is_modify_intent(prompt: str) -> bool:
 
 
 def _apply_deterministic_edit(prompt: str, project_path: str) -> list:
-    """Rule-based file mutations when no model is available."""
+    """Rule-based file mutations — always writes at least one file, no model needed."""
     p = prompt.lower()
-    html_files = sorted(Path(project_path).glob("*.html"))
-    css_files  = sorted(Path(project_path).glob("*.css"))
+    pp = Path(project_path)
+    html_files = sorted(pp.glob("*.html"))
+    css_files  = sorted(pp.glob("*.css"))
     written = []
 
+    # Dark mode → append to style.css (create if missing)
     if "dark mode" in p or "dark theme" in p:
-        dark_css = (
-            "\n/* Dark mode — ClayCode */\n"
-            "body{background:#1a1a1a!important;color:#e0e0e0!important;}\n"
-            ".container,main,section,div{background:#2a2a2a!important;}\n"
-            "h1,h2,h3{color:#e06438!important;}\n"
-            "a{color:#f0a080;}\n"
-            "button{background:#e06438!important;color:#fff!important;}\n"
-        )
-        if css_files:
-            f = css_files[0]
-            f.write_text(f.read_text(encoding="utf-8") + dark_css, encoding="utf-8")
-            written.append(f.name)
-        elif html_files:
-            f = html_files[0]
-            content = f.read_text(encoding="utf-8")
-            if "</style>" in content:
-                content = content.replace("</style>", dark_css + "</style>", 1)
-            else:
-                content = content.replace("</head>", f"<style>{dark_css}</style>\n</head>", 1)
-            f.write_text(content, encoding="utf-8")
-            written.append(f.name)
+        target_css = css_files[0] if css_files else pp / "style.css"
+        existing = target_css.read_text(encoding="utf-8") if target_css.exists() else ""
+        if "background: #111" not in existing:
+            target_css.write_text(
+                existing + "\nbody {\n  background: #111;\n  color: #eee;\n}\n",
+                encoding="utf-8"
+            )
+            written.append(target_css.name)
 
+    # Button → inject before </body>
     if "button" in p and html_files and not written:
         m = re.search(r'button\s+(?:that\s+)?(?:says?\s+|labeled?\s+)?["\']?([^"\'<\n]{1,40})', p)
         label = m.group(1).strip().title() if m else "Click Me"
         f = html_files[0]
         content = f.read_text(encoding="utf-8")
-        btn = f'<button onclick="alert(\'{label} clicked!\')" style="margin:8px;padding:8px 18px;border-radius:6px;border:none;background:#e06438;color:#fff;cursor:pointer">{label}</button>\n'
-        content = content.replace("</body>", btn + "</body>", 1)
-        f.write_text(content, encoding="utf-8")
-        written.append(f.name)
+        if "</body>" in content:
+            content = content.replace("</body>",
+                f'<button onclick="alert(\'{label}!\')">{label}</button>\n</body>', 1)
+            f.write_text(content, encoding="utf-8")
+            written.append(f.name)
 
+    # Text / title → replace first <h1> content
+    if any(w in p for w in ("text", "title", "heading", "h1")) and html_files and not written:
+        m = re.search(r'(?:text|title|heading|h1)\s+(?:to\s+|says?\s+)?["\']?([^"\'<\n]{2,60})', p)
+        if m:
+            new_text = m.group(1).strip()
+            f = html_files[0]
+            content = f.read_text(encoding="utf-8")
+            content = re.sub(r'<h1[^>]*>.*?</h1>', f'<h1>{new_text}</h1>', content,
+                             count=1, flags=re.DOTALL)
+            f.write_text(content, encoding="utf-8")
+            written.append(f.name)
+
+    # Generic fallback — always fires so reload always triggers
     if not written:
-        # Generic: timestamp comment so the reload fires and browser sees a fresh file
         target = html_files[0] if html_files else (css_files[0] if css_files else None)
         if target:
             content = target.read_text(encoding="utf-8")
             ts = datetime.now().strftime("%H:%M:%S")
             if target.suffix == ".html":
-                content = content.replace("</body>",
-                    f"<!-- ClayCode edit {ts}: {prompt[:60]} -->\n</body>", 1)
+                marker = f"<!-- clay:{ts} -->"
+                content = re.sub(r'<!-- clay:[^>]+ -->', '', content)
+                content = content.replace("</body>", marker + "\n</body>", 1) \
+                    if "</body>" in content else content + "\n" + marker
             else:
-                content += f"\n/* ClayCode edit {ts}: {prompt[:60]} */\n"
+                content = re.sub(r'/\* clay:[^*]+ \*/', '', content)
+                content += f"\n/* clay:{ts} */\n"
             target.write_text(content, encoding="utf-8")
             written.append(target.name)
 
@@ -2357,6 +2390,32 @@ def _update_project_files(prompt: str, project_path: str) -> list:
     except Exception:
         pass
     return _apply_deterministic_edit(prompt, project_path)
+
+
+def _ensure_base_structure(project_path: str) -> None:
+    """Guarantee index.html, style.css, and app.js exist — create minimal stubs if missing."""
+    p = Path(project_path)
+    if not (p / "index.html").exists():
+        (p / "index.html").write_text(
+            "<!DOCTYPE html>\n<html>\n<head>\n"
+            "  <title>OpenClay App</title>\n"
+            "  <link rel=\"stylesheet\" href=\"style.css\">\n"
+            "</head>\n<body>\n"
+            "  <h1>Hello from OpenClay</h1>\n"
+            "  <script src=\"app.js\"></script>\n"
+            "</body>\n</html>\n",
+            encoding="utf-8"
+        )
+    if not (p / "style.css").exists():
+        (p / "style.css").write_text(
+            "body { font-family: sans-serif; }\n",
+            encoding="utf-8"
+        )
+    if not (p / "app.js").exists():
+        (p / "app.js").write_text(
+            'console.log("OpenClay running");\n',
+            encoding="utf-8"
+        )
 
 
 def _run_project(project_path: str) -> dict:
@@ -2662,11 +2721,14 @@ class ClayHandler(http.server.SimpleHTTPRequestHandler):
         self.send_header("Access-Control-Allow-Origin", "*")
         self.end_headers()
 
-        # Step 1: workspace
+        _emit("\u26a1 Building...\n\n")   # instant — before any disk or model work
+
+        # Step 1: workspace + base structure
         project_path = _get_or_create_workspace(prompt)
         slug = Path(project_path).name
         existing_files = list(Path(project_path).iterdir()) if Path(project_path).exists() else []
         action = "Updating" if existing_files else "Creating"
+        _ensure_base_structure(project_path)
         _emit(f"\U0001f3d7\ufe0f **{action} project:** `{slug}`\n\n")
 
         # Step 2: generate files
@@ -2733,6 +2795,8 @@ class ClayHandler(http.server.SimpleHTTPRequestHandler):
         self.send_header("Access-Control-Allow-Origin", "*")
         self.end_headers()
 
+        _emit("\U0001f3a8 Applying changes...\n\n")   # instant — before any work
+
         project_path = _active_project.get("path", "")
         if not project_path or not Path(project_path).exists():
             _emit("No active project to modify. Build something first.\n")
@@ -2740,7 +2804,7 @@ class ClayHandler(http.server.SimpleHTTPRequestHandler):
             return
 
         slug = Path(project_path).name
-        _emit(f"\U0001f527 **Updating** `{slug}`\n\n")
+        _ensure_base_structure(project_path)
 
         try:
             files_updated = _update_project_files(prompt, project_path)
@@ -2752,12 +2816,7 @@ class ClayHandler(http.server.SimpleHTTPRequestHandler):
             files_updated = []
 
         if files_updated:
-            port = _active_project.get("port", 0)
-            url = f"http://localhost:{port}" if port else ""
-            if url:
-                _emit(f"\n\u2728 Changes applied — browser refreshing at {url}\n")
-            else:
-                _emit(f"\n\u2728 Changes applied.\n")
+            _emit("\n\u26a1 Updated instantly.\n")
             summary = f"Updated `{slug}` — {', '.join(files_updated)}"
         else:
             _emit("\n\u26a0\ufe0f No changes applied.\n")
