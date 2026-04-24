@@ -2277,12 +2277,33 @@ _MODIFY_VERBS = {"add", "change", "update", "remove", "fix", "improve",
                  "replace", "make", "give", "set"}
 
 
+def _classify_intent(prompt: str) -> str:
+    """Lightweight rule-based intent classifier. No model. No latency.
+
+    Layer 1 of the intelligence architecture — deterministic, offline, instant.
+    Returns: 'modify' | 'build' | 'debug' | 'ask'
+    """
+    words = set(re.findall(r'\w+', prompt.lower()))
+    # Modify beats build when an active project exists
+    if _active_project.get("path") and (words & _MODIFY_VERBS):
+        return "modify"
+    # Build: verb + target noun pair
+    if (words & _BUILD_VERBS) and (words & _BUILD_NOUNS):
+        return "build"
+    # Debug signals
+    t = prompt.lower()
+    if any(kw in t for kw in ("error", "not working", "broken", "crashed", "bug", "debug", "why is")):
+        return "debug"
+    return "ask"
+
+
+def _is_build_intent(prompt: str) -> bool:
+    return _classify_intent(prompt) == "build"
+
+
 def _is_modify_intent(prompt: str) -> bool:
     """True only when there is an active project AND the prompt reads as an edit request."""
-    if not _active_project.get("path"):
-        return False
-    words = set(re.findall(r'\w+', prompt.lower()))
-    return bool(words & _MODIFY_VERBS)
+    return _classify_intent(prompt) == "modify"
 
 
 def _apply_deterministic_edit(prompt: str, project_path: str) -> list:
@@ -2854,16 +2875,15 @@ class ClayHandler(http.server.SimpleHTTPRequestHandler):
         if workflow_prefix:
             prompt = f"{workflow_prefix}\n\n{prompt}"
 
-        # ── Modify active project (checked first — has higher priority than build) ──
-        if _is_modify_intent(prompt):
+        # ── Intent routing — rule-based, instant, model-free ─────────────
+        _intent = _classify_intent(prompt)
+        if _intent == "modify":
             self._handle_modify(prompt)
             return
-
-        # ── Build new project ─────────────────────────────────────────
-        # Runs before model-None guard so template builds work without a model.
-        if _is_build_intent(prompt):
+        if _intent == "build":
             self._handle_build(prompt)
             return
+        # "debug" and "ask" fall through to the model/fallback path below
 
         # ── No model: return instant fallback, never hang ─────────────
         if _model is None:
